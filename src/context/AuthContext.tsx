@@ -51,7 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName } },
+        options: {
+          data: { display_name: displayName },
+          emailRedirectTo: `${window.location.origin}${window.location.pathname}`,
+        },
       })
       if (error) throw error
       return { needsConfirm: !data.session }

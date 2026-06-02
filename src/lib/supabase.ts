@@ -15,5 +15,14 @@ export const isConfigured = Boolean(
 export const supabase = createClient(
   url || 'https://placeholder.supabase.co',
   anon || 'placeholder-anon-key',
-  { auth: { persistSession: true, autoRefreshToken: true } },
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      // PKCE: Bestätigungs-/OAuth-Rücksprung kommt als ?code=… (Query) statt #token —
+      // verträgt sich sauber mit dem HashRouter.
+      flowType: 'pkce',
+    },
+  },
 )
