@@ -1,19 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabase'
 import logo from '../assets/bms-cs-logo.png'
-
-function MsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden style={{ flex: 'none' }}>
-      <rect width="7" height="7" x="0" y="0" fill="#F25022" />
-      <rect width="7" height="7" x="9" y="0" fill="#7FBA00" />
-      <rect width="7" height="7" x="0" y="9" fill="#00A4EF" />
-      <rect width="7" height="7" x="9" y="9" fill="#FFB900" />
-    </svg>
-  )
-}
 
 export default function Login() {
   const { t, i18n } = useTranslation()
@@ -40,19 +28,6 @@ export default function Login() {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
-    }
-  }
-
-  async function microsoft() {
-    setErr(''); setBusy(true)
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'azure',
-        options: { scopes: 'openid email profile', redirectTo: window.location.href.split('#')[0] },
-      })
-      if (error) throw error
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e)); setBusy(false)
     }
   }
 
@@ -97,14 +72,7 @@ export default function Login() {
             </div>
 
             <div className="stack">
-              <button
-                type="button" className="btn block" onClick={microsoft} disabled={busy}
-                style={{ background: 'var(--white)', color: 'var(--ink)', borderColor: 'var(--line)' }}
-              >
-                <MsIcon /> {t('auth.microsoft')}
-              </button>
-              <div className="or-divider"><span>{t('common.or')}</span></div>
-
+              {/* Microsoft-Login (SSO) folgt, sobald Entra ID konfiguriert ist */}
               {mode === 'register' && (
                 <label className="field">
                   {t('auth.displayName')}
