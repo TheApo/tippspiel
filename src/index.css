@@ -165,6 +165,9 @@ p { margin: 0 0 0.75rem; }
 .btn.petrol { background: var(--petrol); border-color: var(--petrol); }
 .btn.ghost { background: transparent; color: var(--navy); }
 .btn.ghost:hover { background: var(--graylight); filter: none; }
+/* Ghost-Button auf dunklem Hintergrund (z. B. Hero) */
+.btn.ghost-light { background: transparent; color: var(--cream); border-color: rgba(255, 255, 255, 0.35); }
+.btn.ghost-light:hover { background: rgba(255, 255, 255, 0.15); color: var(--white); filter: none; }
 .btn.sm { padding: 7px 14px; font-size: 0.82rem; }
 .btn.block { width: 100%; }
 

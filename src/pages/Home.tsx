@@ -51,7 +51,7 @@ export default function Home() {
           <p style={{ color: 'var(--cream)', fontSize: '1.05rem' }}>{t('home.heroText')}</p>
           <div className="row wrap" style={{ marginTop: 20, gap: 10 }}>
             <Link to="/tippen" className="btn accent">{t('home.ctaTip')}</Link>
-            <Link to="/regeln" className="btn ghost" style={{ color: 'var(--cream)', borderColor: 'rgba(255,255,255,.3)' }}>{t('home.ctaRules')}</Link>
+            <Link to="/regeln" className="btn ghost-light">{t('home.ctaRules')}</Link>
           </div>
         </div>
       </section>
