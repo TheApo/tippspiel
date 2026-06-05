@@ -46,7 +46,11 @@ const NAME_ALIAS: Record<string, string> = {
   korearepublic: 'southkorea', koreadpr: 'northkorea', dprkorea: 'northkorea',
   iriran: 'iran', chinapr: 'china', usa: 'unitedstates', unitedstatesofamerica: 'unitedstates',
   cotedivoire: 'ivorycoast', bosniaandherzegovina: 'bosniaherzegovina',
-  czechia: 'czechrepublic', turkiye: 'turkey', capeverde: 'caboverde',
+  czechia: 'czechrepublic', turkiye: 'turkey',
+  // Kap Verde: football-data = "Cape Verde Islands", Odds API = "Cabo Verde"/"Cape Verde"
+  capeverde: 'caboverde', capeverdeislands: 'caboverde',
+  // DR Kongo: football-data = "Congo DR", Odds API = "DR Congo"/"Democratic Republic of Congo"
+  congodr: 'drcongo', democraticrepublicofcongo: 'drcongo', democraticrepublicofthecongo: 'drcongo',
 }
 function normName(s: string | null | undefined): string {
   const n = (s ?? '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '')
@@ -215,28 +219,47 @@ async function resolveBonus(
   matches: FdMatch[],
   scorers: Array<{ team?: { id?: number } }>,
 ) {
+  // Gruppensieger NUR werten, wenn die Gruppe komplett ausgespielt ist.
+  // (Vorläufige Tabellenplätze = Setzliste dürfen keine Antwort/keinen Haken
+  //  erzeugen.) Sonst Antwort explizit auf null -> räumt Voreiliges wieder auf.
+  const gc = new Map<string, { total: number; fin: number }>()
+  for (const m of matches) {
+    if (m.stage !== 'GROUP_STAGE') continue
+    const letter = groupLetter(m.group)
+    if (!letter) continue
+    const e = gc.get(letter) ?? { total: 0, fin: 0 }
+    e.total++
+    if (mapStatus(m.status) === 'FINISHED') e.fin++
+    gc.set(letter, e)
+  }
+  const groupComplete = (letter: string) => {
+    const e = gc.get(letter); return !!e && e.total > 0 && e.fin === e.total
+  }
+  const leaderByLetter = new Map<string, number | undefined>()
   for (const s of standings) {
     if (s.type && s.type !== 'TOTAL') continue
     const letter = groupLetter(s.group ?? null)
-    const winner = s.table?.[0]?.team?.id
-    if (letter && winner) {
-      await db.from('bonus_questions').update({ answer: [String(winner)] }).eq('id', `group_${letter}`)
-    }
+    if (letter) leaderByLetter.set(letter, s.table?.[0]?.team?.id)
   }
+  for (const letter of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']) {
+    const winner = groupComplete(letter) ? leaderByLetter.get(letter) : undefined
+    await db.from('bonus_questions').update({ answer: winner ? [String(winner)] : null }).eq('id', `group_${letter}`)
+  }
+
+  // Weltmeister: erst nach beendetem Finale.
   const final = matches.find((m) => m.stage === 'FINAL' && mapStatus(m.status) === 'FINISHED')
-  if (final?.score.winner) {
-    const champ = final.score.winner === 'HOME_TEAM' ? final.homeTeam.id
-      : final.score.winner === 'AWAY_TEAM' ? final.awayTeam.id : null
-    if (champ) await db.from('bonus_questions').update({ answer: [String(champ)] }).eq('id', 'champion')
-  }
+  const champ = final?.score.winner === 'HOME_TEAM' ? final.homeTeam.id
+    : final?.score.winner === 'AWAY_TEAM' ? final?.awayTeam.id : null
+  await db.from('bonus_questions').update({ answer: champ ? [String(champ)] : null }).eq('id', 'champion')
+
+  // Halbfinalisten: sobald die 4 Teams feststehen (Halbfinal-Paarungen gesetzt).
   const semis = matches.filter((m) => m.stage === 'SEMI_FINALS')
   const semiTeams = [...new Set(semis.flatMap((m) => [m.homeTeam.id, m.awayTeam.id]).filter(Boolean))].map(String)
-  if (semiTeams.length === 4) {
-    await db.from('bonus_questions').update({ answer: semiTeams }).eq('id', 'semifinalists')
-  }
-  // Bonus "Team des Torschützenkönigs": Team des aktuell besten Torschützen
-  const topScorerTeam = scorers[0]?.team?.id
-  if (topScorerTeam) await db.from('bonus_questions').update({ answer: [String(topScorerTeam)] }).eq('id', 'top_scorer')
+  await db.from('bonus_questions').update({ answer: semiTeams.length === 4 ? semiTeams : null }).eq('id', 'semifinalists')
+
+  // Team des Torschützenkönigs: erst zu Turnierende (Finale beendet).
+  const topScorerTeam = final ? scorers[0]?.team?.id : undefined
+  await db.from('bonus_questions').update({ answer: topScorerTeam ? [String(topScorerTeam)] : null }).eq('id', 'top_scorer')
 }
 
 async function recomputeTips(db: Db) {

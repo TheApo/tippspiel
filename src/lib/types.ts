@@ -112,6 +112,51 @@ export interface AppSettings {
   season: string
 }
 
+// ---------------------------------------------------------------------------
+// Gruppen (Teams von Tippern)
+// ---------------------------------------------------------------------------
+export type JoinMode = 'open' | 'apply'
+export type MemberStatus = 'active' | 'pending'
+
+export interface Group {
+  id: string
+  name: string
+  captain_id: string
+  join_mode: JoinMode
+  created_at: string
+}
+
+/** Eine Mitgliedschaft inkl. Anzeigename (für Verwaltungs-/Mitgliederlisten). */
+export interface GroupMember {
+  group_id: string
+  user_id: string
+  status: MemberStatus
+  display_name: string
+}
+
+export interface GroupTotals {
+  group_id: string
+  name: string
+  captain_id: string
+  join_mode: JoinMode
+  member_count: number
+  match_points: number
+  bonus_points: number
+  total: number
+}
+
+export interface GroupMatchdayPoints {
+  group_id: string
+  matchday: number
+  points: number
+}
+
+export interface GroupMatchPoints {
+  group_id: string
+  match_id: number
+  avg_points: number
+}
+
 // Anzeige-Metadaten für Spieltage / Runden
 export const STAGE_LABEL: Record<Stage, { de: string; en: string }> = {
   GROUP: { de: 'Gruppenphase', en: 'Group stage' },

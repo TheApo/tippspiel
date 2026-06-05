@@ -12,6 +12,8 @@ import Leaderboard from './pages/Leaderboard'
 import Tables from './pages/Tables'
 import Rules from './pages/Rules'
 import Admin from './pages/Admin'
+import Profile from './pages/Profile'
+import Groups from './pages/Groups'
 
 function FullSpinner() {
   return (
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="/tabellen" element={<Tables />} />
         <Route path="/regeln" element={<Rules />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/profil" element={<Profile />} />
+        <Route path="/gruppen" element={<Groups />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

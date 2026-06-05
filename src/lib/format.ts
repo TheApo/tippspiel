@@ -23,6 +23,20 @@ export function initials(name: string): string {
   return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('') || '?'
 }
 
+/** Maximale Länge eines Anzeigenamens (Eingabe + Anzeige). */
+export const MAX_NAME = 30
+
+/** Teilnehmername auf max. MAX_NAME Zeichen kürzen — längere mit „…" abschneiden */
+export function truncateName(name: string | null | undefined, max = MAX_NAME): string {
+  const n = (name ?? '').trim()
+  return n.length > max ? n.slice(0, max).trimEnd() + '…' : n
+}
+
+/** Gruppen-Punkte (Durchschnitte): max. 1 Nachkommastelle, lokalisiert (DE-Komma). */
+export function fmtPts(n: number | string | null | undefined, locale: string): string {
+  return Number(n ?? 0).toLocaleString(locale === 'en' ? 'en' : 'de', { maximumFractionDigits: 1 })
+}
+
 /** CSS-Klasse für eine Punktzahl (Farbcodierung 4/3/2/0) */
 export function ptsClass(points: number | null | undefined): string {
   if (points === 4) return 'pts p4'

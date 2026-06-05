@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
+import { MAX_NAME } from '../lib/format'
 import logo from '../assets/bms-cs-logo.png'
 
 export default function Login() {
@@ -76,8 +77,11 @@ export default function Login() {
               {mode === 'register' && (
                 <label className="field">
                   {t('auth.displayName')}
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Max M." />
-                  <span className="muted" style={{ fontWeight: 400, fontSize: '.8rem' }}>{t('auth.displayNameHint')}</span>
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} required maxLength={MAX_NAME} placeholder="Max M." />
+                  <span className="muted" style={{ fontWeight: 400, fontSize: '.8rem', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span>{t('auth.displayNameHint')}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{name.trim().length}/{MAX_NAME}</span>
+                  </span>
                 </label>
               )}
               <label className="field">

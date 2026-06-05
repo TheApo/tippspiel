@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { fetchMatches, fetchTeams, fetchProfiles } from '../lib/queries'
+import { fetchMatches, fetchTeams, fetchProfiles, updateDisplayName } from '../lib/queries'
 import type { Match, Team, Duration, Profile } from '../lib/types'
-import { fmtDate } from '../lib/format'
+import { fmtDate, truncateName, MAX_NAME } from '../lib/format'
 
 export default function Admin() {
   const { t, i18n } = useTranslation()
@@ -16,6 +16,10 @@ export default function Admin() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
+
+  // Inline-Bearbeitung von Teilnehmernamen
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
 
   // Manuelles Ergebnis
   const [matchId, setMatchId] = useState('')
@@ -86,6 +90,20 @@ export default function Admin() {
     } finally { setBusy(false) }
   }
 
+  async function saveName(p: Profile) {
+    const value = editName.trim()
+    if (!value || value === p.display_name) { setEditId(null); return }
+    setBusy(true); setErr(''); setMsg('')
+    try {
+      await updateDisplayName(p.id, value)
+      setProfiles(await fetchProfiles())
+      setEditId(null)
+      setMsg(t('admin.nameUpdated'))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally { setBusy(false) }
+  }
+
   return (
     <div className="stack" style={{ gap: 20, maxWidth: 720 }}>
       <header>
@@ -144,20 +162,46 @@ export default function Admin() {
               <tr><th>{t('uebersicht.name')}</th><th>E-Mail</th><th>{t('admin.created')}</th><th></th></tr>
             </thead>
             <tbody>
-              {profiles.map((p) => (
+              {profiles.map((p) => {
+                const editing = editId === p.id
+                return (
                 <tr key={p.id}>
-                  <td style={{ fontWeight: 600 }}>{p.display_name}{p.is_admin && <span className="badge purpur" style={{ marginLeft: 6 }}>Admin</span>}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    {editing ? (
+                      <input
+                        type="text" value={editName} maxLength={MAX_NAME} autoFocus
+                        style={{ padding: '6px 8px', maxWidth: 200 }}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveName(p); if (e.key === 'Escape') setEditId(null) }}
+                      />
+                    ) : (
+                      <>{truncateName(p.display_name)}{p.is_admin && <span className="badge purpur" style={{ marginLeft: 6 }}>Admin</span>}</>
+                    )}
+                  </td>
                   <td className="muted">{p.email}</td>
                   <td className="muted">{p.created_at ? fmtDate(p.created_at, lng) : '—'}</td>
                   <td className="num">
-                    {p.id !== profile?.id && (
-                      <button className="btn ghost sm" style={{ color: 'var(--purpur)', borderColor: 'var(--purpur)' }} disabled={busy} onClick={() => kick(p)}>
-                        {t('admin.remove')}
-                      </button>
-                    )}
+                    <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                      {editing ? (
+                        <>
+                          <button className="btn accent sm" disabled={busy} onClick={() => saveName(p)}>{t('common.save')}</button>
+                          <button className="btn ghost sm" disabled={busy} onClick={() => setEditId(null)}>{t('common.cancel')}</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn ghost sm" disabled={busy} onClick={() => { setEditId(p.id); setEditName(p.display_name) }}>{t('admin.editName')}</button>
+                          {p.id !== profile?.id && (
+                            <button className="btn ghost sm" style={{ color: 'var(--purpur)', borderColor: 'var(--purpur)' }} disabled={busy} onClick={() => kick(p)}>
+                              {t('admin.remove')}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

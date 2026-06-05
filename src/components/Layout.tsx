@@ -2,16 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
-import { initials } from '../lib/format'
+import { initials, truncateName } from '../lib/format'
 import logo from '../assets/bms-cs-logo.png'
 
 function AccountMenu() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const lng = i18n.resolvedLanguage
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -25,7 +24,7 @@ function AccountMenu() {
     <div className="account" ref={ref}>
       <button className="account-btn" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>
         <span className="avatar">{initials(profile?.display_name ?? '?')}</span>
-        <span className="account-name">{profile?.display_name}</span>
+        <span className="account-name">{truncateName(profile?.display_name)}</span>
         <span className="caret">▾</span>
       </button>
 
@@ -33,23 +32,19 @@ function AccountMenu() {
         <div className="account-pop card" role="menu">
           <div className="account-head">
             <span className="avatar lg">{initials(profile?.display_name ?? '?')}</span>
-            <div style={{ minWidth: 0 }}>
-              <strong style={{ display: 'block' }}>{profile?.display_name}</strong>
-              <span className="muted" style={{ fontSize: '.8rem', wordBreak: 'break-all' }}>{profile?.email}</span>
-              {profile?.is_admin && <span className="badge purpur" style={{ marginTop: 4 }}>Admin</span>}
-            </div>
+            <strong className="account-fullname">{truncateName(profile?.display_name)}</strong>
+            <span className="account-email">{profile?.email}</span>
+            {profile?.is_admin && <span className="badge purpur">Admin</span>}
           </div>
 
           <hr className="divider" />
 
-          <div className="account-row">
-            <span className="muted" style={{ fontWeight: 600 }}>{t('account.language')}</span>
-            <div className="lang-toggle light">
-              {(['de', 'en'] as const).map((l) => (
-                <button key={l} className={lng === l ? 'on' : ''} onClick={() => i18n.changeLanguage(l)}>{l.toUpperCase()}</button>
-              ))}
-            </div>
-          </div>
+          <button className="account-item" role="menuitem" onClick={() => { setOpen(false); navigate('/profil') }}>
+            👤 {t('account.profile')}
+          </button>
+          <button className="account-item" role="menuitem" onClick={() => { setOpen(false); navigate('/gruppen') }}>
+            👥 {t('account.groups')}
+          </button>
 
           {profile?.is_admin && (
             <button className="account-item" role="menuitem" onClick={() => { setOpen(false); navigate('/admin') }}>

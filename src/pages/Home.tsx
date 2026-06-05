@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import { fetchMatches, fetchTeams, fetchSettings, fetchUserTotals } from '../lib/queries'
 import type { Match, Team, AppSettings, UserTotals } from '../lib/types'
-import { fmtDateTime, kickoffLocked } from '../lib/format'
+import { fmtDateTime, kickoffLocked, truncateName } from '../lib/format'
 import { teamName } from '../lib/teamNames'
 import { Flag } from '../components/Flag'
 
@@ -46,7 +46,7 @@ export default function Home() {
       >
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
         <div style={{ position: 'relative', maxWidth: 640 }}>
-          <span className="eyebrow" style={{ color: 'var(--petrol)' }}>{t('home.hello', { name: profile?.display_name ?? '' })}</span>
+          <span className="eyebrow" style={{ color: 'var(--petrol)' }}>{t('home.hello', { name: truncateName(profile?.display_name) })}</span>
           <h1 style={{ color: 'var(--white)', margin: '8px 0 12px' }}>{t('home.heroTitle')}</h1>
           <p style={{ color: 'var(--cream)', fontSize: '1.05rem' }}>{t('home.heroText')}</p>
           <div className="row wrap" style={{ marginTop: 20, gap: 10 }}>
@@ -100,7 +100,7 @@ export default function Home() {
               {top3.map((u, i) => (
                 <li key={u.user_id} className="row" style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', gap: 12 }}>
                   <span className="tag-rule" style={{ background: i === 0 ? 'var(--purpur)' : 'var(--lilac)', color: i === 0 ? '#fff' : 'var(--navy)' }}>{i + 1}</span>
-                  <strong style={{ flex: 1, fontWeight: 600 }}>{u.display_name}</strong>
+                  <strong style={{ flex: 1, fontWeight: 600 }}>{truncateName(u.display_name)}</strong>
                   <span className="pts p2" style={{ fontSize: '1.1rem' }}>{u.total}</span>
                 </li>
               ))}
