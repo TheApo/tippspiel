@@ -95,13 +95,13 @@ export default function Leaderboard() {
         <div className="card pad muted">{t('leaderboard.empty')}</div>
       ) : (
         <div className="panel" style={{ overflowX: 'auto' }}>
-          <table className="table" style={{ minWidth: 640 }}>
+          <table className="table">
             <thead>
               <tr>
                 <th style={{ width: 44 }}>{t('leaderboard.rank')}</th>
                 <th>{isGroup ? t('leaderboard.groupCol') : t('leaderboard.player')}</th>
                 {matchdays.map((md) => (
-                  <th key={md} className="num" title={`${t('common.matchday')} ${md}`}>{mdLabel(md)}</th>
+                  <th key={md} className="num col-md" title={`${t('common.matchday')} ${md}`}>{mdLabel(md)}</th>
                 ))}
                 <th className="num" style={{ color: 'var(--purpur)' }}>{t('common.bonus')}</th>
                 <th className="num" style={{ color: 'var(--navy)' }}>{t('common.total')}</th>
@@ -120,7 +120,7 @@ export default function Leaderboard() {
                       </td>
                       {matchdays.map((md) => {
                         const p = row?.get(md)
-                        return <td key={md} className="num" style={{ color: p ? 'var(--ink)' : 'var(--gray)' }}>{p ? fmtPts(p, '') : '·'}</td>
+                        return <td key={md} className="num col-md" style={{ color: p ? 'var(--ink)' : 'var(--gray)' }}>{p ? fmtPts(p, '') : '·'}</td>
                       })}
                       <td className="num" style={{ color: 'var(--purpur)', fontWeight: 700 }}>{Number(g.bonus_points) ? fmtPts(g.bonus_points, '') : '·'}</td>
                       <td className="num" style={{ fontWeight: 800, fontSize: '1.05rem' }}>{fmtPts(g.total, '')}</td>
@@ -138,7 +138,7 @@ export default function Leaderboard() {
                       </td>
                       {matchdays.map((md) => {
                         const p = row?.get(md)
-                        return <td key={md} className="num" style={{ color: p ? 'var(--ink)' : 'var(--gray)' }}>{p ?? '·'}</td>
+                        return <td key={md} className="num col-md" style={{ color: p ? 'var(--ink)' : 'var(--gray)' }}>{p ?? '·'}</td>
                       })}
                       <td className="num" style={{ color: 'var(--purpur)', fontWeight: 700 }}>{u.bonus_points || '·'}</td>
                       <td className="num" style={{ fontWeight: 800, fontSize: '1.05rem' }}>{u.total}</td>

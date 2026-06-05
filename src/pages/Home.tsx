@@ -78,12 +78,16 @@ export default function Home() {
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {next.map((m) => (
-                <li key={m.id} className="row" style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', gap: 12 }}>
-                  <span className="badge cream" style={{ minWidth: 64, justifyContent: 'center' }}>{t('common.matchday')} {m.matchday}</span>
-                  <span className="row" style={{ gap: 8, flex: 1, justifyContent: 'flex-end' }}><strong style={{ fontWeight: 600 }}>{teamName(teamsMap.get(m.home_team_id!), lng)}</strong><Flag team={teamsMap.get(m.home_team_id!)} /></span>
-                  <span className="muted" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>:</span>
-                  <span className="row" style={{ gap: 8, flex: 1 }}><Flag team={teamsMap.get(m.away_team_id!)} /><strong style={{ fontWeight: 600 }}>{teamName(teamsMap.get(m.away_team_id!), lng)}</strong></span>
-                  <span className="muted" style={{ fontSize: '.8rem', minWidth: 120, textAlign: 'right' }}>{fmtDateTime(m.kickoff, lng)}</span>
+                <li key={m.id} className="next-match">
+                  <div className="nm-top">
+                    <span className="badge cream">{t('common.matchday')} {m.matchday}</span>
+                    <span className="muted nm-date">{fmtDateTime(m.kickoff, lng)}</span>
+                  </div>
+                  <div className="nm-teams">
+                    <span className="t home"><span className="nm">{teamName(teamsMap.get(m.home_team_id!), lng)}</span><Flag team={teamsMap.get(m.home_team_id!)} /></span>
+                    <span className="sep">:</span>
+                    <span className="t away"><Flag team={teamsMap.get(m.away_team_id!)} /><span className="nm">{teamName(teamsMap.get(m.away_team_id!), lng)}</span></span>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -96,8 +96,8 @@ export default function Tippen() {
         <h1>{t('tippen.title')}</h1>
       </header>
 
-      {/* Matchday picker */}
-      <div className="row wrap" style={{ gap: 8 }}>
+      {/* Matchday picker — horizontal scrollbar auf dem Handy */}
+      <div className="chips">
         {matchdays.map((d) => (
           <button key={d} className={`btn sm ${d === md ? '' : 'ghost'}`} onClick={() => setMd(d)}>
             {mdLabel(d)}
@@ -128,7 +128,7 @@ export default function Tippen() {
       )}
 
       {err && <div className="alert err">{err}</div>}
-      <div className="row" style={{ position: 'sticky', bottom: 16, justifyContent: 'flex-end', gap: 12 }}>
+      <div className="save-bar">
         {toast && <span className="alert ok">{toast}</span>}
         <button className="btn accent" disabled={busy || loading} onClick={saveAll}>
           {busy ? t('common.loading') : t('tippen.saveAll')}
@@ -152,23 +152,23 @@ function MatchRow({
   const probs = impliedProbs(m.odd_home, m.odd_draw, m.odd_away)
 
   return (
-    <div className="row wrap" style={{ padding: '14px 18px', borderTop: first ? 0 : '1px solid var(--line)', gap: 12 }}>
-      <div style={{ minWidth: 110 }}>
-        <div className="muted" style={{ fontSize: '.74rem', fontWeight: 700 }}>{fmtDate(m.kickoff, lng)}</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '.9rem' }}>{fmtTime(m.kickoff, lng)}</div>
-        <div className="muted" style={{ fontSize: '.68rem' }}>{matchLabel(m, lng, t('common.group'))}</div>
+    <div className={`match${first ? ' first' : ''}`}>
+      <div className="match-meta">
+        <div className="d">{fmtDate(m.kickoff, lng)}</div>
+        <div className="tm">{fmtTime(m.kickoff, lng)}</div>
+        <div className="rd">{matchLabel(m, lng, t('common.group'))}</div>
       </div>
 
-      {/* Teams + inputs */}
-      <div className="row" style={{ flex: 1, gap: 10, justifyContent: 'center', minWidth: 280 }}>
+      {/* Desktop: zentriert Heim 🏴 [ ]:[ ] 🏴 Gast */}
+      <div className="match-teams-d">
         <span className="row" style={{ gap: 8, flex: 1, justifyContent: 'flex-end' }}>
           <strong style={{ fontWeight: 600, textAlign: 'right' }}>{home ? teamName(home, lng) : t('tippen.tbd')}</strong>
           <Flag team={home} />
         </span>
         <span className="row" style={{ gap: 6 }}>
-          <input className="score-input" inputMode="numeric" disabled={locked} value={draft?.home ?? ''} onChange={(e) => onChange(m.id, 'home', e.target.value)} placeholder="–" />
+          <input className="score-input" inputMode="numeric" disabled={locked} value={draft?.home ?? ''} onChange={(e) => onChange(m.id, 'home', e.target.value)} placeholder="–" aria-label={home ? teamName(home, lng) : 'Heim'} />
           <span className="muted" style={{ fontWeight: 700 }}>:</span>
-          <input className="score-input" inputMode="numeric" disabled={locked} value={draft?.away ?? ''} onChange={(e) => onChange(m.id, 'away', e.target.value)} placeholder="–" />
+          <input className="score-input" inputMode="numeric" disabled={locked} value={draft?.away ?? ''} onChange={(e) => onChange(m.id, 'away', e.target.value)} placeholder="–" aria-label={away ? teamName(away, lng) : 'Gast'} />
         </span>
         <span className="row" style={{ gap: 8, flex: 1 }}>
           <Flag team={away} />
@@ -176,8 +176,22 @@ function MatchRow({
         </span>
       </div>
 
-      {/* Status / result / points */}
-      <div style={{ minWidth: 150, textAlign: 'right' }}>
+      {/* Mobil: je Team eine Zeile (Flagge · Name · Eingabe) */}
+      <div className="match-teams-m">
+        <div className="team-row">
+          <Flag team={home} />
+          <span className="nm">{home ? teamName(home, lng) : t('tippen.tbd')}</span>
+          <input className="score-input" inputMode="numeric" disabled={locked} value={draft?.home ?? ''} onChange={(e) => onChange(m.id, 'home', e.target.value)} placeholder="–" aria-label={home ? teamName(home, lng) : 'Heim'} />
+        </div>
+        <div className="team-row">
+          <Flag team={away} />
+          <span className="nm">{away ? teamName(away, lng) : t('tippen.tbd')}</span>
+          <input className="score-input" inputMode="numeric" disabled={locked} value={draft?.away ?? ''} onChange={(e) => onChange(m.id, 'away', e.target.value)} placeholder="–" aria-label={away ? teamName(away, lng) : 'Gast'} />
+        </div>
+      </div>
+
+      {/* Status / Ergebnis / Punkte */}
+      <div className="match-status">
         {finished ? (
           <div>
             <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
@@ -196,7 +210,7 @@ function MatchRow({
       </div>
 
       {probs && (
-        <div style={{ flexBasis: '100%' }}>
+        <div className="match-odds">
           <div className="odds-bar" title={`Quoten  1 ${m.odd_home}  ·  X ${m.odd_draw}  ·  2 ${m.odd_away}`}>
             <span className="oh" style={{ flexGrow: probs.home }}>1 · {probs.home}%</span>
             <span className="od" style={{ flexGrow: probs.draw }}>X · {probs.draw}%</span>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import { initials, truncateName } from '../lib/format'
@@ -62,6 +62,8 @@ function AccountMenu() {
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
+  const { pathname } = useLocation()
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const links: Array<[string, string]> = [
     ['/', t('nav.home')],
@@ -72,6 +74,20 @@ export default function Layout({ children }: { children: ReactNode }) {
     ['/tabellen', t('nav.tables')],
     ['/regeln', t('nav.rules')],
   ]
+
+  // Mobile: die 3 wichtigsten als Tab-Leiste unten, der Rest unter „Mehr".
+  const tabs: Array<[string, string, string]> = [
+    ['/tippen', t('nav.tippen'), '⚽'],
+    ['/tippuebersicht', t('nav.overviewShort'), '📋'],
+    ['/gesamtliste', t('nav.leaderboardShort'), '🏆'],
+  ]
+  const moreLinks: Array<[string, string]> = [
+    ['/', t('nav.home')],
+    ['/bonus', t('nav.bonus')],
+    ['/tabellen', t('nav.tables')],
+    ['/regeln', t('nav.rules')],
+  ]
+  const moreActive = !tabs.some(([to]) => to === pathname)
 
   return (
     <div className="app">
@@ -106,6 +122,30 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span>{t('appName')} · {t('tournament')}</span>
         </div>
       </footer>
+
+      {/* Mobile: Tab-Leiste unten */}
+      <nav className="tabbar" aria-label="Navigation">
+        {tabs.map(([to, label, ic]) => (
+          <NavLink key={to} to={to} className={({ isActive }) => `tabbar-item${isActive ? ' active' : ''}`} onClick={() => setMoreOpen(false)}>
+            <span className="ic">{ic}</span>{label}
+          </NavLink>
+        ))}
+        <button className={`tabbar-item${moreActive ? ' active' : ''}`} onClick={() => setMoreOpen((o) => !o)} aria-haspopup="menu" aria-expanded={moreOpen}>
+          <span className="ic">☰</span>{t('nav.more')}
+        </button>
+      </nav>
+      {moreOpen && (
+        <>
+          <button className="tab-scrim" aria-label="schließen" onClick={() => setMoreOpen(false)} />
+          <div className="tab-sheet card" role="menu">
+            {moreLinks.map(([to, label]) => (
+              <NavLink key={to} to={to} end={to === '/'} className="account-item" role="menuitem" onClick={() => setMoreOpen(false)}>
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

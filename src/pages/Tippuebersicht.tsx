@@ -209,14 +209,14 @@ export default function Tippuebersicht() {
         <>
           {/* Spielliste */}
           <div className="panel" style={{ overflowX: 'auto' }}>
-            <table className="table" style={{ minWidth: 560 }}>
+            <table className="table">
               <thead>
                 <tr>
                   <th>{t('uebersicht.termin')}</th>
                   <th>{t('uebersicht.heim')}</th>
                   <th>{t('uebersicht.gast')}</th>
-                  <th>{t('uebersicht.gruppe')}</th>
-                  <th className="num">{t('uebersicht.ergebnis')}</th>
+                  <th className="col-group">{t('uebersicht.gruppe')}</th>
+                  <th className="num"><span className="lbl-full">{t('uebersicht.ergebnis')}</span><span className="lbl-short">{t('uebersicht.ergShort')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -226,10 +226,10 @@ export default function Tippuebersicht() {
                   const suffix = m.duration === 'PENALTY_SHOOTOUT' ? ' n.E.' : m.duration === 'EXTRA_TIME' ? ' n.V.' : ''
                   return (
                     <tr key={m.id}>
-                      <td className="muted" style={{ whiteSpace: 'nowrap' }}>{fmtDate(m.kickoff, lng)} {fmtTime(m.kickoff, lng)}</td>
-                      <td><span className="row" style={{ gap: 8 }}><Flag team={home} /> {teamName(home, lng)}</span></td>
-                      <td><span className="row" style={{ gap: 8 }}><Flag team={away} /> {teamName(away, lng)}</span></td>
-                      <td className="muted">{m.group_letter ? `${t('common.group')} ${m.group_letter}` : STAGE_LABEL[m.stage][lng]}</td>
+                      <td className="muted">{fmtDate(m.kickoff, lng)} {fmtTime(m.kickoff, lng)}</td>
+                      <td><span className="row" style={{ gap: 8 }}><Flag team={home} /> <span className="lbl-full">{teamName(home, lng)}</span><span className="lbl-short" style={{ fontFamily: 'var(--font-mono)' }}>{home?.tla ?? teamName(home, lng)}</span></span></td>
+                      <td><span className="row" style={{ gap: 8 }}><Flag team={away} /> <span className="lbl-full">{teamName(away, lng)}</span><span className="lbl-short" style={{ fontFamily: 'var(--font-mono)' }}>{away?.tla ?? teamName(away, lng)}</span></span></td>
+                      <td className="muted col-group">{m.group_letter ? `${t('common.group')} ${m.group_letter}` : STAGE_LABEL[m.stage][lng]}</td>
                       <td className="num" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fin ? `${m.full_home}:${m.full_away}${suffix}` : '-:-'}</td>
                     </tr>
                   )
@@ -245,10 +245,10 @@ export default function Tippuebersicht() {
             <div className="card pad muted">{t('uebersicht.noGroups')}</div>
           ) : (
             <div className="panel" style={{ overflowX: 'auto' }}>
-              <table className="table" style={{ minWidth: 640 }}>
+              <table className="table sticky" style={{ minWidth: 640 }}>
                 <thead>
                   <tr>
-                    <th style={{ width: 38 }}>{t('uebersicht.pos')}</th>
+                    <th className="col-pos" style={{ width: 38 }}>{t('uebersicht.pos')}</th>
                     <th>{isGroup ? t('leaderboard.groupCol') : t('uebersicht.name')}</th>
                     {dayMatches.map((m) => (
                       <th key={m.id} className="num" style={{ lineHeight: 1.15 }}>
@@ -266,7 +266,7 @@ export default function Tippuebersicht() {
                   {isGroup
                     ? groupRows.map((g, i) => (
                       <tr key={g.group_id}>
-                        <td style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
+                        <td className="col-pos" style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
                         <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {currentGroupWinners.has(g.group_id) && <span title={t('uebersicht.mdWinner')}>🏆 </span>}
                           {truncateName(g.name)}
@@ -288,8 +288,8 @@ export default function Tippuebersicht() {
                       const tot = totalsMap.get(p.id)
                       const tr = trophies.get(p.id) ?? 0
                       return (
-                        <tr key={p.id} style={isMe ? { background: 'var(--cream)' } : undefined}>
-                          <td style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
+                        <tr key={p.id} className={isMe ? 'me' : undefined} style={isMe ? { background: 'var(--cream)' } : undefined}>
+                          <td className="col-pos" style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
                           <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {currentWinners.has(p.id) && <span title={t('uebersicht.mdWinner')}>🏆 </span>}
                             {truncateName(p.display_name)}
@@ -396,10 +396,10 @@ function AllBonusTable({ rows, me, questions, teamsMap, tipsMap, answersMap, tot
   return (
     <>
       <div className="panel" style={{ overflowX: 'auto' }}>
-        <table className="table compact" style={{ minWidth: 640 }}>
+        <table className="table compact sticky" style={{ minWidth: 640 }}>
           <thead>
             <tr>
-              <th style={{ width: 38 }}>{t('uebersicht.pos')}</th>
+              <th className="col-pos" style={{ width: 38 }}>{t('uebersicht.pos')}</th>
               <th>{t('uebersicht.name')}</th>
               {questions.map((q) => <th key={q.id} className="num" title={bonusLabel(q, t)}>{bonusShort(q, t)}</th>)}
               <th className="num" title={t('uebersicht.bTitle')} style={{ color: 'var(--purpur)' }}>{t('uebersicht.bShort')}</th>
@@ -407,8 +407,8 @@ function AllBonusTable({ rows, me, questions, teamsMap, tipsMap, answersMap, tot
           </thead>
           <tbody>
             {sorted.map((p, i) => (
-              <tr key={p.id} style={p.id === me ? { background: 'var(--cream)' } : undefined}>
-                <td style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
+              <tr key={p.id} className={p.id === me ? 'me' : undefined} style={p.id === me ? { background: 'var(--cream)' } : undefined}>
+                <td className="col-pos" style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
                 <td style={{ fontWeight: 600 }}>
                   {truncateName(p.display_name)}{p.id === me && <span className="badge petrol" style={{ marginLeft: 6 }}>{t('uebersicht.you')}</span>}
                 </td>
@@ -464,10 +464,10 @@ function GroupBonusOverview({ rows, t }: {
   const sorted = [...rows].sort((a, b) => Number(b.bonus_points) - Number(a.bonus_points) || a.name.localeCompare(b.name))
   return (
     <div className="panel" style={{ overflowX: 'auto' }}>
-      <table className="table" style={{ minWidth: 360 }}>
+      <table className="table sticky" style={{ minWidth: 360 }}>
         <thead>
           <tr>
-            <th style={{ width: 38 }}>{t('uebersicht.pos')}</th>
+            <th className="col-pos" style={{ width: 38 }}>{t('uebersicht.pos')}</th>
             <th>{t('leaderboard.groupCol')}</th>
             <th className="num" style={{ color: 'var(--purpur)' }}>{t('uebersicht.bonusPoints')}</th>
             <th className="num">{t('uebersicht.gShort')}</th>
@@ -476,7 +476,7 @@ function GroupBonusOverview({ rows, t }: {
         <tbody>
           {sorted.map((g, i) => (
             <tr key={g.group_id}>
-              <td style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
+              <td className="col-pos" style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
               <td style={{ fontWeight: 600 }}>{truncateName(g.name)}<span className="muted" style={{ marginLeft: 6, fontSize: '.8rem', fontWeight: 400 }}>· {g.member_count}</span></td>
               <td className="num" style={{ color: 'var(--purpur)', fontWeight: 700 }}>{fmtPts(g.bonus_points, '')}</td>
               <td className="num" style={{ fontWeight: 800 }}>{fmtPts(g.total, '')}</td>

@@ -152,7 +152,7 @@ export default function Bonus() {
 
       {err && <div className="alert err">{err}</div>}
       {!closed && (
-        <div className="row" style={{ position: 'sticky', bottom: 16, justifyContent: 'flex-end', gap: 12 }}>
+        <div className="save-bar">
           {toast && <span className="alert ok">{toast}</span>}
           <button className="btn accent" disabled={busy} onClick={saveAll}>{busy ? t('common.loading') : t('bonus.save')}</button>
         </div>

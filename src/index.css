@@ -82,7 +82,7 @@ p { margin: 0 0 0.75rem; }
 }
 .header .container { display: flex; align-items: center; gap: 12px; height: 64px; }
 .brand { display: flex; align-items: center; gap: 12px; flex: none; }
-.brand img { height: 26px; display: block; }
+.brand img { height: 26px; display: block; filter: brightness(0) invert(1); }
 .brand .sep { width: 1px; height: 26px; background: rgba(255, 255, 255, 0.25); }
 .brand .tag { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--cream); }
 .nav { display: flex; gap: 2px; margin-left: 6px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
@@ -268,4 +268,99 @@ input:focus, select:focus { border-color: var(--petrol); box-shadow: 0 0 0 3px v
 }
 @media (max-width: 600px) {
   .account-name, .caret { display: none; }
+}
+
+/* ===========================================================================
+   Responsive / Mobile
+   =========================================================================== */
+/* Horizontal scrollender Chip-Streifen (z. B. Spieltagswahl) */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Kurzlabel-Umschaltung (voll am Desktop, Kürzel auf dem Handy) */
+.lbl-short { display: none; }
+
+/* Match-Zeile (Tippen): pro Team eine Zeile, responsive */
+.match { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 18px; border-top: 1px solid var(--line); }
+.match.first { border-top: 0; }
+.match-meta { min-width: 96px; }
+.match-meta .d { font-size: 0.74rem; font-weight: 700; color: #5b5b86; }
+.match-meta .tm { font-family: var(--font-mono); font-weight: 700; font-size: 0.92rem; color: var(--ink); }
+.match-meta .rd { font-size: 0.68rem; color: #5b5b86; }
+.match-teams-d { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 280px; }
+.match-teams-m { display: none; flex-direction: column; gap: 8px; flex-basis: 100%; }
+.team-row { display: flex; align-items: center; gap: 10px; }
+.team-row .nm { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-row .score-input { flex: none; }
+.match-status { min-width: 116px; text-align: right; }
+.match-odds { flex-basis: 100%; }
+
+/* Startseite: Nächste Spiele (sauber gestapelt) */
+.next-match { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.nm-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nm-date { font-size: 0.8rem; }
+.nm-teams { display: flex; align-items: center; gap: 10px; }
+.nm-teams .t { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-weight: 600; }
+.nm-teams .t.home { justify-content: flex-end; text-align: right; }
+.nm-teams .t .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm-teams .sep { flex: none; color: var(--gray); font-family: var(--font-mono); font-weight: 700; }
+
+@media (max-width: 600px) {
+  .match { gap: 10px; padding: 12px 14px; }
+  .match-meta { order: 1; flex: 1 1 auto; min-width: 0; }
+  .match-status { order: 2; min-width: 0; margin-left: auto; }
+  .match-teams-d { display: none; }
+  .match-teams-m { display: flex; order: 3; }
+  .match-odds { order: 4; }
+}
+
+@media (max-width: 640px) {
+  .container { padding: 0 14px; }
+  .page { padding: 20px 0 76px; }
+  .footer { display: none; }
+  /* Spieltagswahl: auf dem Handy Wisch-Streifen statt Umbruch */
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips > * { flex: none; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.25rem; }
+  .card.pad { padding: 16px; }
+  .table th, .table td { padding: 8px 8px; font-size: 0.86rem; }
+  .account-pop { width: 280px; max-width: calc(100vw - 20px); }
+  /* Sekundäre Tabellenspalten auf dem Handy ausblenden */
+  .col-md, .col-pos, .col-group { display: none; }
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+  /* Breite Matrix-Tabellen: Name-Spalte beim seitlichen Wischen fixieren */
+  .table.sticky thead th:nth-child(2), .table.sticky tbody td:nth-child(2) {
+    position: sticky; left: 0; z-index: 2; background: var(--white);
+    box-shadow: 6px 0 6px -6px rgba(0, 0, 100, 0.18);
+  }
+  .table.sticky thead th:nth-child(2) { z-index: 3; background: var(--graylight); }
+  .table.sticky tbody tr.me td:nth-child(2) { background: var(--cream); }
+}
+
+/* ---------- Mobile Bottom-Tab-Leiste ---------- */
+.tabbar { display: none; }
+.tab-scrim, .tab-sheet { display: none; }
+.save-bar { position: sticky; bottom: 16px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+
+@media (max-width: 640px) {
+  .nav { display: none; }
+  .account { margin-left: auto; }
+  .save-bar { bottom: 76px; }
+  .tabbar {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    background: var(--navy); border-top: 1px solid rgba(255, 255, 255, 0.14);
+    padding: 6px 4px; padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+  .tabbar-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: transparent; border: 0; cursor: pointer; text-decoration: none;
+    color: rgba(255, 255, 255, 0.72); font-family: var(--font-display); font-weight: 700;
+    font-size: 0.64rem; padding: 5px 2px; border-radius: 10px;
+  }
+  .tabbar-item .ic { font-size: 1.2rem; line-height: 1; }
+  .tabbar-item.active { color: var(--cream); }
+  .tab-scrim { display: block; position: fixed; inset: 0; z-index: 79; background: rgba(0, 0, 40, 0.35); border: 0; padding: 0; }
+  .tab-sheet { display: flex; flex-direction: column; gap: 2px; position: fixed; left: 12px; right: 12px; bottom: 74px; z-index: 81; padding: 8px; box-shadow: var(--shadow-lg); }
 }
