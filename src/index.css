@@ -171,6 +171,17 @@ p { margin: 0 0 0.75rem; }
 .btn.sm { padding: 7px 14px; font-size: 0.82rem; }
 .btn.block { width: 100%; }
 
+/* textbasierter Link-Button (z. B. „Passwort vergessen?") */
+.linklike { align-self: flex-end; background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--petrol); font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; }
+.linklike:hover { text-decoration: underline; }
+
+/* ---------- Modal / Bestätigungsdialog ---------- */
+.modal-scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 40, 0.45);
+  display: grid; place-items: center; padding: 20px; }
+.modal { width: 100%; max-width: 420px; padding: 22px; box-shadow: var(--shadow-lg); }
+.modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
 .or-divider { display: flex; align-items: center; gap: 10px; }
 .or-divider span { color: var(--gray); font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }

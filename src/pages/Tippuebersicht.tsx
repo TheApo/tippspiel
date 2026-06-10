@@ -39,7 +39,7 @@ export default function Tippuebersicht() {
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'md' | 'bonus'>('md')
   const [mode, setMode] = useState<'solo' | 'group'>('solo')
-  const [md, setMd] = useState<number | null>(null)
+  const [mdSel, setMd] = useState<number | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -62,11 +62,13 @@ export default function Tippuebersicht() {
   }, [matches])
   const matchdays = useMemo(() => [...matchesByMd.keys()].sort((a, b) => a - b), [matchesByMd])
 
-  useEffect(() => {
-    if (md !== null || matchdays.length === 0) return
+  // Default-Spieltag: erster mit offenen Spielen — abgeleitet statt per Effekt gesetzt.
+  const defaultMd = useMemo(() => {
+    if (matchdays.length === 0) return null
     const open = matchdays.find((d) => (matchesByMd.get(d) ?? []).some((m) => !kickoffLocked(m.kickoff)))
-    setMd(open ?? matchdays[0])
-  }, [matchdays, matchesByMd, md])
+    return open ?? matchdays[0]
+  }, [matchdays, matchesByMd])
+  const md = mdSel ?? defaultMd
 
   const tipsMap = useMemo(() => new Map(tips.map((t) => [`${t.user_id}|${t.match_id}`, t])), [tips])
   const statusSet = useMemo(() => new Set(status.map((s) => `${s.user_id}|${s.match_id}`)), [status])
@@ -346,6 +348,12 @@ const bonusShort = (q: BonusQuestion, t: TFn): string =>
     : q.category === 'semifinalists' ? t('uebersicht.semiShort')
     : t('uebersicht.scorerShort')
 
+// Anzeige-Reihenfolge der Bonusfragen: Gruppensieger A–L, dann Halbfinalisten,
+// dann Weltmeister, zuletzt Torschützenkönig (HF vor WM).
+const BONUS_ORDER: Record<string, number> = { group_winner: 0, semifinalists: 1, champion: 2, top_scorer: 3 }
+const orderBonus = (qs: BonusQuestion[]): BonusQuestion[] =>
+  [...qs].sort((a, b) => (BONUS_ORDER[a.category] ?? 9) - (BONUS_ORDER[b.category] ?? 9))
+
 /** Persönliche, read-only Übersicht der eigenen Bonus-Tipps (✓ wenn korrekt). */
 function MyBonusCard({ me, questions, teamsMap, tipsMap, answersMap, myBonus, lng, t }: {
   me?: string; questions: BonusQuestion[]
@@ -353,6 +361,7 @@ function MyBonusCard({ me, questions, teamsMap, tipsMap, answersMap, myBonus, ln
   myBonus: number; lng: 'de' | 'en'; t: TFn
 }) {
   const correct = (qid: string, teamId: string) => answersMap.get(qid)?.includes(teamId) ?? false
+  const ordered = orderBonus(questions)
   return (
     <section className="card pad stack" style={{ gap: 10, borderTop: '4px solid var(--purpur)' }}>
       <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -360,9 +369,9 @@ function MyBonusCard({ me, questions, teamsMap, tipsMap, answersMap, myBonus, ln
         <span className="badge purpur">{t('uebersicht.bonusPoints')}: {myBonus}</span>
       </div>
       <div className="bonus-grid">
-        {questions.map((q) => {
+        {ordered.map((q) => {
           const picks = (me && tipsMap.get(`${me}|${q.id}`)) || []
-          const wide = q.category === 'semifinalists'
+          const wide = q.category === 'semifinalists' || q.category === 'champion'
           return (
             <div className={`bonus-item${wide ? ' wide' : ''}`} key={q.id}>
               <span className="lbl">{bonusLabel(q, t)}</span>
@@ -392,6 +401,7 @@ function AllBonusTable({ rows, me, questions, teamsMap, tipsMap, answersMap, tot
   totalsMap: Map<string, UserTotals>; t: TFn
 }) {
   const sorted = [...rows].sort((a, b) => (totalsMap.get(b.id)?.bonus_points ?? 0) - (totalsMap.get(a.id)?.bonus_points ?? 0) || a.display_name.localeCompare(b.display_name))
+  const cols = orderBonus(questions)
   const correct = (qid: string, teamId: string) => answersMap.get(qid)?.includes(teamId) ?? false
   return (
     <>
@@ -401,7 +411,7 @@ function AllBonusTable({ rows, me, questions, teamsMap, tipsMap, answersMap, tot
             <tr>
               <th className="col-pos" style={{ width: 38 }}>{t('uebersicht.pos')}</th>
               <th>{t('uebersicht.name')}</th>
-              {questions.map((q) => <th key={q.id} className="num" title={bonusLabel(q, t)}>{bonusShort(q, t)}</th>)}
+              {cols.map((q) => <th key={q.id} className="num" title={bonusLabel(q, t)}>{bonusShort(q, t)}</th>)}
               <th className="num" title={t('uebersicht.bTitle')} style={{ color: 'var(--purpur)' }}>{t('uebersicht.bShort')}</th>
             </tr>
           </thead>
@@ -412,7 +422,7 @@ function AllBonusTable({ rows, me, questions, teamsMap, tipsMap, answersMap, tot
                 <td style={{ fontWeight: 600 }}>
                   {truncateName(p.display_name)}{p.id === me && <span className="badge petrol" style={{ marginLeft: 6 }}>{t('uebersicht.you')}</span>}
                 </td>
-                {questions.map((q) => (
+                {cols.map((q) => (
                   <td key={q.id} className="num">
                     <BonusPick picks={tipsMap.get(`${p.id}|${q.id}`)} isSet={q.category === 'semifinalists'}
                       teamsMap={teamsMap} correct={(tid) => correct(q.id, tid)} />

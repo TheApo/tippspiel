@@ -27,7 +27,9 @@ export default function Groups() {
     const [g, m] = await Promise.all([fetchGroups(), fetchGroupMembers()])
     setGroups(g); setMembers(m)
   }
-  useEffect(() => { reload().finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    void (async () => { try { await reload() } finally { setLoading(false) } })()
+  }, [])
 
   const act: Act = async (p, successMsg) => {
     setBusy(true); setErr(''); setMsg('')

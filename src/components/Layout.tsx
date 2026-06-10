@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import { initials, truncateName } from '../lib/format'
+import UnsavedGuard from './UnsavedGuard'
 import logo from '../assets/bms-cs-logo.png'
 
 function AccountMenu() {
@@ -91,6 +92,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="app">
+      <UnsavedGuard />
       <header className="header">
         <div className="container">
           <NavLink to="/" className="brand">

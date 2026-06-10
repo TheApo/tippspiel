@@ -6,8 +6,8 @@ import logo from '../assets/bms-cs-logo.png'
 
 export default function Login() {
   const { t, i18n } = useTranslation()
-  const { signIn, signUp } = useAuth()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const { signIn, signUp, resetPassword } = useAuth()
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -21,9 +21,12 @@ export default function Login() {
     try {
       if (mode === 'login') {
         await signIn(email.trim(), password)
-      } else {
+      } else if (mode === 'register') {
         const { needsConfirm } = await signUp(email.trim(), password, name.trim())
         if (needsConfirm) setInfo(t('auth.checkEmail'))
+      } else {
+        await resetPassword(email.trim())
+        setInfo(t('auth.resetSent'))
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
@@ -64,7 +67,7 @@ export default function Login() {
         <section style={{ background: 'var(--graylight)', display: 'grid', placeItems: 'center', padding: 24 }}>
           <form onSubmit={submit} className="card pad" style={{ width: '100%', maxWidth: 380 }}>
             <div className="row" style={{ justifyContent: 'space-between', marginBottom: 18 }}>
-              <h2 style={{ fontSize: '1.5rem' }}>{mode === 'login' ? t('auth.login') : t('auth.register')}</h2>
+              <h2 style={{ fontSize: '1.5rem' }}>{mode === 'login' ? t('auth.login') : mode === 'register' ? t('auth.register') : t('auth.forgotTitle')}</h2>
               <div className="lang-toggle" style={{ background: 'var(--lilac)' }}>
                 {(['de', 'en'] as const).map((l) => (
                   <button type="button" key={l} className={i18n.resolvedLanguage === l ? 'on' : ''} style={{ color: i18n.resolvedLanguage === l ? 'var(--navy)' : 'var(--navy-300)' }} onClick={() => i18n.changeLanguage(l)}>{l.toUpperCase()}</button>
@@ -74,6 +77,9 @@ export default function Login() {
 
             <div className="stack">
               {/* Microsoft-Login (SSO) folgt, sobald Entra ID konfiguriert ist */}
+              {mode === 'forgot' && (
+                <p className="muted" style={{ fontSize: '.9rem', marginTop: -4 }}>{t('auth.forgotSubtitle')}</p>
+              )}
               {mode === 'register' && (
                 <label className="field">
                   {t('auth.displayName')}
@@ -88,21 +94,35 @@ export default function Login() {
                 {t('auth.email')}
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="vorname.nachname@bms-cs.de" autoComplete="email" />
               </label>
-              <label className="field">
-                {t('auth.password')}
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-              </label>
+              {mode !== 'forgot' && (
+                <label className="field">
+                  {t('auth.password')}
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+                </label>
+              )}
+
+              {mode === 'login' && (
+                <button type="button" className="linklike" onClick={() => { setMode('forgot'); setErr(''); setInfo('') }}>
+                  {t('auth.forgotLink')}
+                </button>
+              )}
 
               {err && <div className="alert err">{err}</div>}
               {info && <div className="alert ok">{info}</div>}
 
               <button className="btn accent block" disabled={busy} type="submit">
-                {busy ? t('common.loading') : mode === 'login' ? t('auth.login') : t('auth.register')}
+                {busy ? t('common.loading') : mode === 'login' ? t('auth.login') : mode === 'register' ? t('auth.register') : t('auth.sendReset')}
               </button>
 
-              <button type="button" className="btn ghost block sm" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setErr(''); setInfo('') }}>
-                {mode === 'login' ? t('auth.toRegister') : t('auth.toLogin')}
-              </button>
+              {mode === 'forgot' ? (
+                <button type="button" className="btn ghost block sm" onClick={() => { setMode('login'); setErr(''); setInfo('') }}>
+                  {t('auth.backToLogin')}
+                </button>
+              ) : (
+                <button type="button" className="btn ghost block sm" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setErr(''); setInfo('') }}>
+                  {mode === 'login' ? t('auth.toRegister') : t('auth.toLogin')}
+                </button>
+              )}
             </div>
           </form>
         </section>

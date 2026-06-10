@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
+import { useUnsaved } from '../context/UnsavedContext'
 import { fetchMatches, fetchTeams, fetchMyTips, saveTip } from '../lib/queries'
 import type { Match, Team, Tip } from '../lib/types'
 import { fmtDate, fmtTime, kickoffLocked, ptsClass } from '../lib/format'
@@ -8,6 +9,7 @@ import { matchdayLabel, matchLabel } from '../lib/matchday'
 import { impliedProbs } from '../lib/odds'
 import { teamName } from '../lib/teamNames'
 import { Flag } from '../components/Flag'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 type Draft = Record<number, { home: string; away: string }>
 
@@ -36,7 +38,9 @@ export default function Tippen() {
     setDraft(d)
   }
 
-  useEffect(() => { load().finally(() => setLoading(false)) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void (async () => { try { await load() } finally { setLoading(false) } })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const teamsMap = useMemo(() => new Map(teams.map((x) => [x.id, x])), [teams])
   const tipsMap = useMemo(() => new Map(tips.map((x) => [x.match_id, x])), [tips])
@@ -46,42 +50,98 @@ export default function Tippen() {
     [matches],
   )
 
-  // Default-Spieltag: erster mit offenen Spielen
-  useEffect(() => {
-    if (md !== null || matchdays.length === 0) return
+  // Default-Spieltag: erster mit offenen Spielen — abgeleitet statt per Effekt gesetzt.
+  const defaultMd = useMemo(() => {
+    if (matchdays.length === 0) return null
     const open = matchdays.find((d) => matches.some((m) => m.matchday === d && !kickoffLocked(m.kickoff)))
-    setMd(open ?? matchdays[0])
-  }, [matchdays, matches, md])
+    return open ?? matchdays[0]
+  }, [matchdays, matches])
+  const activeMd = md ?? defaultMd
 
   function mdLabel(day: number): string {
     return matchdayLabel(matches.filter((m) => m.matchday === day), day, lng)
   }
 
   const dayMatches = useMemo(
-    () => matches.filter((m) => m.matchday === md),
-    [matches, md],
+    () => matches.filter((m) => m.matchday === activeMd),
+    [matches, activeMd],
   )
+
+  // Offene, geänderte Tipps des aktuellen Spieltags (= ungespeicherte Tipps).
+  const dayJobs = useMemo(
+    () => dayMatches
+      .filter((m) => !kickoffLocked(m.kickoff))
+      .map((m) => ({ m, d: draft[m.id] }))
+      .filter(({ d }) => d && d.home !== '' && d.away !== '')
+      .filter(({ m, d }) => { const cur = tipsMap.get(m.id); return !cur || cur.home !== Number(d!.home) || cur.away !== Number(d!.away) })
+      .map(({ m, d }) => ({ m, home: Number(d!.home), away: Number(d!.away) })),
+    [dayMatches, draft, tipsMap],
+  )
+  const dirty = dayJobs.length > 0
+
+  // Tipp-Warnung beim Seitenwechsel (Router) — über den UnsavedGuard im Layout.
+  const { setDirty, registerSave } = useUnsaved()
+  useEffect(() => { setDirty(dirty) }, [dirty, setDirty])
+  useEffect(() => () => setDirty(false), [setDirty])
+  // jeweils aktuelle Save-Closure registrieren (für den Guard)
+  useEffect(() => { registerSave(() => persist(dayJobs)) })
+
+  // Tab schließen / neu laden warnt zusätzlich nativ
+  useEffect(() => {
+    if (!dirty) return
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', h)
+    return () => window.removeEventListener('beforeunload', h)
+  }, [dirty])
+
+  // Spieltagswechsel: bei ungespeicherten Tipps erst nachfragen
+  const [pendingMd, setPendingMd] = useState<number | null>(null)
+  function requestMd(target: number) {
+    if (target === activeMd) return
+    if (dirty) setPendingMd(target)
+    else setMd(target)
+  }
+  function revertDay() {
+    setDraft((d) => {
+      const next = { ...d }
+      for (const m of dayMatches) {
+        const cur = tipsMap.get(m.id)
+        if (cur) next[m.id] = { home: String(cur.home), away: String(cur.away) }
+        else delete next[m.id]
+      }
+      return next
+    })
+  }
 
   function setScore(id: number, side: 'home' | 'away', v: string) {
     const clean = v.replace(/[^0-9]/g, '').slice(0, 2)
     setDraft((d) => ({ ...d, [id]: { home: d[id]?.home ?? '', away: d[id]?.away ?? '', [side]: clean } }))
   }
 
-  async function saveAll() {
+  async function persist(jobs: { m: Match; home: number; away: number }[]) {
+    for (const { m, home, away } of jobs) await saveTip(m.id, home, away)
+    await load()
+  }
+
+  async function saveCurrent() {
     setBusy(true); setErr(''); setToast('')
     try {
-      const jobs = dayMatches
-        .filter((m) => !kickoffLocked(m.kickoff))
-        .map((m) => ({ m, d: draft[m.id] }))
-        .filter(({ d }) => d && d.home !== '' && d.away !== '')
-        .filter(({ m, d }) => {
-          const cur = tipsMap.get(m.id)
-          return !cur || cur.home !== Number(d!.home) || cur.away !== Number(d!.away)
-        })
-      for (const { m, d } of jobs) await saveTip(m.id, Number(d!.home), Number(d!.away))
-      await load()
+      await persist(dayJobs)
       setToast(t('tippen.savedToast'))
       setTimeout(() => setToast(''), 2500)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveAndSwitch() {
+    setBusy(true); setErr('')
+    try {
+      await persist(dayJobs)
+      if (pendingMd !== null) setMd(pendingMd)
+      setPendingMd(null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -99,7 +159,7 @@ export default function Tippen() {
       {/* Matchday picker — horizontal scrollbar auf dem Handy */}
       <div className="chips">
         {matchdays.map((d) => (
-          <button key={d} className={`btn sm ${d === md ? '' : 'ghost'}`} onClick={() => setMd(d)}>
+          <button key={d} className={`btn sm ${d === activeMd ? '' : 'ghost'}`} onClick={() => requestMd(d)}>
             {mdLabel(d)}
           </button>
         ))}
@@ -130,10 +190,24 @@ export default function Tippen() {
       {err && <div className="alert err">{err}</div>}
       <div className="save-bar">
         {toast && <span className="alert ok">{toast}</span>}
-        <button className="btn accent" disabled={busy || loading} onClick={saveAll}>
+        <button className="btn accent" disabled={busy || loading} onClick={saveCurrent}>
           {busy ? t('common.loading') : t('tippen.saveAll')}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={pendingMd !== null}
+        title={t('unsaved.title')}
+        body={t('unsaved.body')}
+        saveLabel={t('common.save')}
+        discardLabel={t('common.discard')}
+        stayLabel={t('unsaved.stay')}
+        onSave={saveAndSwitch}
+        onDiscard={() => { revertDay(); if (pendingMd !== null) setMd(pendingMd); setPendingMd(null) }}
+        onStay={() => setPendingMd(null)}
+        busy={busy}
+        error={err}
+      />
     </div>
   )
 }

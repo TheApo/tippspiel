@@ -36,7 +36,9 @@ export default function Bonus() {
     for (const x of bt) d[x.question_id] = x.picks
     setDraft(d)
   }
-  useEffect(() => { load().finally(() => setLoading(false)) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void (async () => { try { await load() } finally { setLoading(false) } })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const closed = Boolean(settings?.bonus_deadline && kickoffLocked(settings.bonus_deadline))
   const tipsMap = useMemo(() => new Map(myTips.map((x) => [x.question_id, x])), [myTips])

@@ -9,7 +9,7 @@ import { fmtDate, truncateName, MAX_NAME } from '../lib/format'
 export default function Admin() {
   const { t, i18n } = useTranslation()
   const lng = i18n.resolvedLanguage ?? 'de'
-  const { profile } = useAuth()
+  const { profile, resetPassword } = useAuth()
   const [matches, setMatches] = useState<Match[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -90,6 +90,18 @@ export default function Admin() {
     } finally { setBusy(false) }
   }
 
+  async function sendReset(p: Profile) {
+    if (!p.email) return
+    if (!window.confirm(t('admin.resetConfirm', { name: p.display_name }))) return
+    setBusy(true); setErr(''); setMsg('')
+    try {
+      await resetPassword(p.email)
+      setMsg(t('admin.resetSent', { email: p.email }))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally { setBusy(false) }
+  }
+
   async function saveName(p: Profile) {
     const value = editName.trim()
     if (!value || value === p.display_name) { setEditId(null); return }
@@ -105,7 +117,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="stack" style={{ gap: 20, maxWidth: 720 }}>
+    <div className="stack" style={{ gap: 20, maxWidth: 1040 }}>
       <header>
         <span className="eyebrow">{t('nav.admin')}</span>
         <h1>{t('admin.title')}</h1>
@@ -166,7 +178,7 @@ export default function Admin() {
                 const editing = editId === p.id
                 return (
                 <tr key={p.id}>
-                  <td style={{ fontWeight: 600 }}>
+                  <td style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
                     {editing ? (
                       <input
                         type="text" value={editName} maxLength={MAX_NAME} autoFocus
@@ -178,10 +190,10 @@ export default function Admin() {
                       <>{truncateName(p.display_name)}{p.is_admin && <span className="badge purpur" style={{ marginLeft: 6 }}>Admin</span>}</>
                     )}
                   </td>
-                  <td className="muted">{p.email}</td>
-                  <td className="muted">{p.created_at ? fmtDate(p.created_at, lng) : '—'}</td>
+                  <td className="muted" style={{ overflowWrap: 'anywhere' }}>{p.email}</td>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>{p.created_at ? fmtDate(p.created_at, lng) : '—'}</td>
                   <td className="num">
-                    <div className="row" style={{ gap: 6, justifyContent: 'flex-end' }}>
+                    <div className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                       {editing ? (
                         <>
                           <button className="btn accent sm" disabled={busy} onClick={() => saveName(p)}>{t('common.save')}</button>
@@ -190,6 +202,7 @@ export default function Admin() {
                       ) : (
                         <>
                           <button className="btn ghost sm" disabled={busy} onClick={() => { setEditId(p.id); setEditName(p.display_name) }}>{t('admin.editName')}</button>
+                          <button className="btn ghost sm" disabled={busy} onClick={() => sendReset(p)}>{t('admin.resetPw')}</button>
                           {p.id !== profile?.id && (
                             <button className="btn ghost sm" style={{ color: 'var(--purpur)', borderColor: 'var(--purpur)' }} disabled={busy} onClick={() => kick(p)}>
                               {t('admin.remove')}

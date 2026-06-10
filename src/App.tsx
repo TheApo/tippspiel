@@ -1,9 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { createHashRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { isConfigured } from './lib/supabase'
+import { UnsavedProvider } from './context/UnsavedContext'
 import Layout from './components/Layout'
 import ConfigGate from './components/ConfigGate'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Home from './pages/Home'
 import Tippen from './pages/Tippen'
 import Bonus from './pages/Bonus'
@@ -23,28 +25,38 @@ function FullSpinner() {
   )
 }
 
+// Data-Router (HashRouter-kompatibel für GitHub Pages). Wurzel = Layout, das via
+// <Outlet/> die Seiten rendert — so steht useBlocker (Tipp-Warnung) zur Verfügung.
+const router = createHashRouter([
+  {
+    element: <Layout><Outlet /></Layout>,
+    children: [
+      { path: '/', element: <Home /> },
+      { path: '/tippen', element: <Tippen /> },
+      { path: '/bonus', element: <Bonus /> },
+      { path: '/tippuebersicht', element: <Tippuebersicht /> },
+      { path: '/gesamtliste', element: <Leaderboard /> },
+      { path: '/tabellen', element: <Tables /> },
+      { path: '/regeln', element: <Rules /> },
+      { path: '/admin', element: <Admin /> },
+      { path: '/profil', element: <Profile /> },
+      { path: '/gruppen', element: <Groups /> },
+      { path: '*', element: <Navigate to="/" replace /> },
+    ],
+  },
+])
+
 export default function App() {
-  const { session, loading } = useAuth()
+  const { session, loading, recovery } = useAuth()
 
   if (!isConfigured) return <ConfigGate />
   if (loading) return <FullSpinner />
+  if (recovery) return <ResetPassword />
   if (!session) return <Login />
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/tippen" element={<Tippen />} />
-        <Route path="/bonus" element={<Bonus />} />
-        <Route path="/tippuebersicht" element={<Tippuebersicht />} />
-        <Route path="/gesamtliste" element={<Leaderboard />} />
-        <Route path="/tabellen" element={<Tables />} />
-        <Route path="/regeln" element={<Rules />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/profil" element={<Profile />} />
-        <Route path="/gruppen" element={<Groups />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <UnsavedProvider>
+      <RouterProvider router={router} />
+    </UnsavedProvider>
   )
 }
