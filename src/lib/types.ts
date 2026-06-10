@@ -37,6 +37,8 @@ export interface Match {
   winner: string | null
   eff_home: number | null
   eff_away: number | null
+  live_home: number | null
+  live_away: number | null
   odd_home: number | null
   odd_draw: number | null
   odd_away: number | null

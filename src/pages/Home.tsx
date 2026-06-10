@@ -6,6 +6,8 @@ import { fetchMatches, fetchTeams, fetchSettings, fetchUserTotals } from '../lib
 import type { Match, Team, AppSettings, UserTotals } from '../lib/types'
 import { fmtDateTime, kickoffLocked, truncateName } from '../lib/format'
 import { teamName } from '../lib/teamNames'
+import { isLive } from '../lib/live'
+import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
 export default function Home() {
@@ -17,13 +19,17 @@ export default function Home() {
   const [totals, setTotals] = useState<UserTotals[]>([])
   const [loading, setLoading] = useState(true)
 
+  async function reload() {
+    const [m, tm, s, tot] = await Promise.all([fetchMatches(), fetchTeams(), fetchSettings(), fetchUserTotals()])
+    setMatches(m); setTeams(tm); setSettings(s); setTotals(tot)
+  }
   useEffect(() => {
-    Promise.all([fetchMatches(), fetchTeams(), fetchSettings(), fetchUserTotals()])
-      .then(([m, tm, s, tot]) => { setMatches(m); setTeams(tm); setSettings(s); setTotals(tot) })
-      .finally(() => setLoading(false))
+    void (async () => { try { await reload() } finally { setLoading(false) } })()
   }, [])
 
   const teamsMap = useMemo(() => new Map(teams.map((x) => [x.id, x])), [teams])
+  const liveMatches = useMemo(() => matches.filter(isLive), [matches])
+  useLiveRefresh(liveMatches.length > 0, reload)
   const next = useMemo(
     () => matches.filter((m) => !kickoffLocked(m.kickoff) && m.home_team_id && m.away_team_id).slice(0, 5),
     [matches],
@@ -73,10 +79,23 @@ export default function Home() {
           <div className="panel-head"><h3>{t('home.nextMatches')}</h3></div>
           {loading ? (
             <div className="card pad" style={{ border: 0, boxShadow: 'none' }}><div className="skeleton" style={{ height: 56 }} /></div>
-          ) : next.length === 0 ? (
+          ) : next.length === 0 && liveMatches.length === 0 ? (
             <div className="card pad muted" style={{ border: 0, boxShadow: 'none' }}>{t('home.noData')}</div>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {liveMatches.map((m) => (
+                <li key={m.id} className="next-match">
+                  <div className="nm-top">
+                    <span className="badge live">{t('common.live')}</span>
+                    <span className="live-score">{m.live_home}:{m.live_away}<span className="live-dot" style={{ marginLeft: 5 }} /></span>
+                  </div>
+                  <div className="nm-teams">
+                    <span className="t home"><span className="nm">{teamName(teamsMap.get(m.home_team_id!), lng)}</span><Flag team={teamsMap.get(m.home_team_id!)} /></span>
+                    <span className="sep">:</span>
+                    <span className="t away"><Flag team={teamsMap.get(m.away_team_id!)} /><span className="nm">{teamName(teamsMap.get(m.away_team_id!), lng)}</span></span>
+                  </div>
+                </li>
+              ))}
               {next.map((m) => (
                 <li key={m.id} className="next-match">
                   <div className="nm-top">

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { fetchMatches, fetchTeams } from '../lib/queries'
 import type { Match, Team } from '../lib/types'
 import { teamName } from '../lib/teamNames'
+import { isLive } from '../lib/live'
+import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
 interface Row {
@@ -33,11 +35,25 @@ export default function Tables() {
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
 
+  async function reload() {
+    const [m, tm] = await Promise.all([fetchMatches(), fetchTeams()])
+    setMatches(m); setTeams(tm)
+  }
   useEffect(() => {
-    Promise.all([fetchMatches(), fetchTeams()])
-      .then(([m, tm]) => { setMatches(m); setTeams(tm) })
-      .finally(() => setLoading(false))
+    void (async () => { try { await reload() } finally { setLoading(false) } })()
   }, [])
+
+  // Laufende Gruppenspiele markieren (Tabellenstände bleiben bis Abpfiff)
+  const liveMatches = useMemo(() => matches.filter(isLive), [matches])
+  useLiveRefresh(liveMatches.length > 0, reload)
+  const liveByTeam = useMemo(() => {
+    const map = new Map<string, Match>()
+    for (const m of liveMatches) {
+      if (m.home_team_id) map.set(m.home_team_id, m)
+      if (m.away_team_id) map.set(m.away_team_id, m)
+    }
+    return map
+  }, [liveMatches])
 
   const groups = useMemo(() => {
     const byGroup: Record<string, Team[]> = {}
@@ -73,15 +89,24 @@ export default function Tables() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r, i) => (
+                  {rows.map((r, i) => {
+                    const lm = liveByTeam.get(r.team.id)
+                    const isHome = lm?.home_team_id === r.team.id
+                    return (
                     <tr key={r.team.id}>
                       <td style={{ color: i < 2 ? 'var(--petrol)' : 'var(--gray)', fontWeight: 700 }}>{i + 1}</td>
-                      <td><span className="row" style={{ gap: 8 }}><Flag team={r.team} /> {teamName(r.team, lng)}</span></td>
+                      <td>
+                        <span className="row" style={{ gap: 8 }}>
+                          <Flag team={r.team} /> {teamName(r.team, lng)}
+                          {lm && <span className="badge live" title={t('common.live')}>{t('common.live')} {isHome ? lm.live_home : lm.live_away}:{isHome ? lm.live_away : lm.live_home}</span>}
+                        </span>
+                      </td>
                       <td className="num">{r.pld}</td>
                       <td className="num">{r.gf - r.ga > 0 ? '+' : ''}{r.gf - r.ga}</td>
                       <td className="num" style={{ fontWeight: 800 }}>{r.pts}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </section>

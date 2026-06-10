@@ -4,16 +4,18 @@ import { useAuth } from '../context/AuthContext'
 import {
   fetchMatches, fetchTeams, fetchProfiles, fetchVisibleTips, fetchTipStatus,
   fetchMatchdayPoints, fetchUserTotals, fetchBonusQuestions, fetchBonusTips,
-  fetchGroupTotals, fetchGroupMatchPoints, fetchGroupMatchdayPoints,
+  fetchGroupTotals, fetchGroupMatchPoints, fetchGroupMatchdayPoints, fetchGroupMembers,
 } from '../lib/queries'
 import {
   STAGE_LABEL, type Match, type Team, type Profile, type Tip, type TipStatus,
   type MatchdayPoints, type UserTotals, type BonusQuestion, type BonusTip,
-  type GroupTotals, type GroupMatchPoints, type GroupMatchdayPoints,
+  type GroupTotals, type GroupMatchPoints, type GroupMatchdayPoints, type GroupMember,
 } from '../lib/types'
 import { fmtDate, fmtTime, kickoffLocked, ptsClass, truncateName, fmtPts } from '../lib/format'
 import { matchdayLabel } from '../lib/matchday'
 import { teamName } from '../lib/teamNames'
+import { isLive, liveTipPoints, userLiveDeltas, groupLiveDeltas, groupLiveMatchAvgs } from '../lib/live'
+import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
 const MIN_GROUP = 2
@@ -36,22 +38,29 @@ export default function Tippuebersicht() {
   const [groupTotals, setGroupTotals] = useState<GroupTotals[]>([])
   const [groupMatchPts, setGroupMatchPts] = useState<GroupMatchPoints[]>([])
   const [groupMd, setGroupMd] = useState<GroupMatchdayPoints[]>([])
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'md' | 'bonus'>('md')
   const [mode, setMode] = useState<'solo' | 'group'>('solo')
   const [mdSel, setMd] = useState<number | null>(null)
 
-  useEffect(() => {
-    Promise.all([
+  async function reload() {
+    const [m, tm, pr, tp, st, mp, to, bq, bt, gt, gmp, gmd, gmem] = await Promise.all([
       fetchMatches(), fetchTeams(), fetchProfiles(), fetchVisibleTips(), fetchTipStatus(),
       fetchMatchdayPoints(), fetchUserTotals(), fetchBonusQuestions(), fetchBonusTips(),
-      fetchGroupTotals(), fetchGroupMatchPoints(), fetchGroupMatchdayPoints(),
-    ]).then(([m, tm, pr, tp, st, mp, to, bq, bt, gt, gmp, gmd]) => {
-      setMatches(m); setTeams(tm); setProfiles(pr); setTips(tp); setStatus(st)
-      setMdPoints(mp); setTotals(to); setBonusQuestions(bq); setBonusTips(bt)
-      setGroupTotals(gt); setGroupMatchPts(gmp); setGroupMd(gmd)
-    }).finally(() => setLoading(false))
+      fetchGroupTotals(), fetchGroupMatchPoints(), fetchGroupMatchdayPoints(), fetchGroupMembers(),
+    ])
+    setMatches(m); setTeams(tm); setProfiles(pr); setTips(tp); setStatus(st)
+    setMdPoints(mp); setTotals(to); setBonusQuestions(bq); setBonusTips(bt)
+    setGroupTotals(gt); setGroupMatchPts(gmp); setGroupMd(gmd); setGroupMembers(gmem)
+  }
+  useEffect(() => {
+    void (async () => { try { await reload() } finally { setLoading(false) } })()
   }, [])
+
+  // Laufende Spiele: regelmäßig nachladen für aktuelle Live-Stände/-Punkte.
+  const liveMatches = useMemo(() => matches.filter(isLive), [matches])
+  useLiveRefresh(liveMatches.length > 0, reload)
 
   const teamsMap = useMemo(() => new Map(teams.map((x) => [x.id, x])), [teams])
   const matchesByMd = useMemo(() => {
@@ -77,7 +86,15 @@ export default function Tippuebersicht() {
   const bonusQs = useMemo(() => [...bonusQuestions].sort((a, b) => a.sort - b.sort), [bonusQuestions])
   const bonusTipsMap = useMemo(() => new Map(bonusTips.map((b) => [`${b.user_id}|${b.question_id}`, b.picks])), [bonusTips])
   const answersMap = useMemo(() => new Map(bonusQuestions.map((q) => [q.id, q.answer])), [bonusQuestions])
-  const ptsOf = (u: string, day: number) => mdPtsMap.get(`${u}|${day}`) ?? 0
+
+  // Vorläufige Live-Punkte (überlagern die bestätigten Totals bis Abpfiff)
+  const userLive = useMemo(() => userLiveDeltas(liveMatches, tips), [liveMatches, tips])
+  const activeMembers = useMemo(() => groupMembers.filter((g) => g.status === 'active'), [groupMembers])
+  const groupLive = useMemo(() => groupLiveDeltas(liveMatches, tips, activeMembers), [liveMatches, tips, activeMembers])
+  const groupLiveMatch = useMemo(() => groupLiveMatchAvgs(liveMatches, tips, activeMembers), [liveMatches, tips, activeMembers])
+
+  const ptsOf = (u: string, day: number) => (mdPtsMap.get(`${u}|${day}`) ?? 0) + (userLive.get(u)?.byMd.get(day) ?? 0)
+  const totalOf = (u: string) => (totalsMap.get(u)?.total ?? 0) + (userLive.get(u)?.total ?? 0)
 
   // Eigenen Account immer in der Liste haben (Absicherung)
   const allProfiles = useMemo(() => {
@@ -118,7 +135,7 @@ export default function Tippuebersicht() {
   const rows = useMemo(() => {
     return [...allProfiles].sort((a, b) => {
       if (md != null) { const d = ptsOf(b.id, md) - ptsOf(a.id, md); if (d) return d }
-      const ta = totalsMap.get(a.id)?.total ?? 0, tb = totalsMap.get(b.id)?.total ?? 0
+      const ta = totalOf(a.id), tb = totalOf(b.id)
       return tb - ta || a.display_name.localeCompare(b.display_name)
     })
   }, [allProfiles, md, mdPtsMap, totalsMap]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -127,7 +144,8 @@ export default function Tippuebersicht() {
   const groupRowsAll = useMemo(() => groupTotals.filter((g) => g.member_count >= MIN_GROUP), [groupTotals])
   const groupMatchMap = useMemo(() => new Map(groupMatchPts.map((p) => [`${p.group_id}|${p.match_id}`, Number(p.avg_points)])), [groupMatchPts])
   const groupMdMap = useMemo(() => new Map(groupMd.map((p) => [`${p.group_id}|${p.matchday}`, Number(p.points)])), [groupMd])
-  const gPtsOf = (gid: string, day: number) => groupMdMap.get(`${gid}|${day}`) ?? 0
+  const gPtsOf = (gid: string, day: number) => (groupMdMap.get(`${gid}|${day}`) ?? 0) + (groupLive.get(gid)?.byMd.get(day) ?? 0)
+  const gTotalOf = (g: GroupTotals) => Number(g.total) + (groupLive.get(g.group_id)?.total ?? 0)
 
   const groupTrophies = useMemo(() => {
     const tr = new Map<string, number>()
@@ -151,7 +169,7 @@ export default function Tippuebersicht() {
   const groupRows = useMemo(() => {
     return [...groupRowsAll].sort((a, b) => {
       if (md != null) { const d = gPtsOf(b.group_id, md) - gPtsOf(a.group_id, md); if (d) return d }
-      return Number(b.total) - Number(a.total) || a.name.localeCompare(b.name)
+      return gTotalOf(b) - gTotalOf(a) || a.name.localeCompare(b.name)
     })
   }, [groupRowsAll, md, groupMdMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -232,7 +250,11 @@ export default function Tippuebersicht() {
                       <td><span className="row" style={{ gap: 8 }}><Flag team={home} /> <span className="lbl-full">{teamName(home, lng)}</span><span className="lbl-short" style={{ fontFamily: 'var(--font-mono)' }}>{home?.tla ?? teamName(home, lng)}</span></span></td>
                       <td><span className="row" style={{ gap: 8 }}><Flag team={away} /> <span className="lbl-full">{teamName(away, lng)}</span><span className="lbl-short" style={{ fontFamily: 'var(--font-mono)' }}>{away?.tla ?? teamName(away, lng)}</span></span></td>
                       <td className="muted col-group">{m.group_letter ? `${t('common.group')} ${m.group_letter}` : STAGE_LABEL[m.stage][lng]}</td>
-                      <td className="num" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fin ? `${m.full_home}:${m.full_away}${suffix}` : '-:-'}</td>
+                      <td className="num" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                        {fin ? `${m.full_home}:${m.full_away}${suffix}`
+                          : isLive(m) ? <span className="live-score" title={t('common.live')}>{m.live_home}:{m.live_away}<span className="live-dot" style={{ marginLeft: 5 }} /></span>
+                          : '-:-'}
+                      </td>
                     </tr>
                   )
                 })}
@@ -266,7 +288,10 @@ export default function Tippuebersicht() {
                 </thead>
                 <tbody>
                   {isGroup
-                    ? groupRows.map((g, i) => (
+                    ? groupRows.map((g, i) => {
+                      const gLiveMd = md != null ? (groupLive.get(g.group_id)?.byMd.get(md) ?? 0) : 0
+                      const gLiveTot = groupLive.get(g.group_id)?.total ?? 0
+                      return (
                       <tr key={g.group_id}>
                         <td className="col-pos" style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
                         <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -276,19 +301,22 @@ export default function Tippuebersicht() {
                         </td>
                         {dayMatches.map((m) => (
                           <td key={m.id} className="num">
-                            <GroupCell avg={groupMatchMap.get(`${g.group_id}|${m.id}`)} locked={kickoffLocked(m.kickoff)} />
+                            <GroupCell avg={groupLiveMatch.get(`${g.group_id}|${m.id}`) ?? groupMatchMap.get(`${g.group_id}|${m.id}`)} live={isLive(m)} locked={kickoffLocked(m.kickoff)} />
                           </td>
                         ))}
-                        <td className="num" style={{ fontWeight: 700 }}>{md != null ? fmtPts(gPtsOf(g.group_id, md), '') : '0'}</td>
+                        <td className="num" style={{ fontWeight: 700, color: gLiveMd ? 'var(--petrol)' : undefined }} title={gLiveMd ? t('common.liveProvisional') : undefined}>{md != null ? fmtPts(gPtsOf(g.group_id, md), '') : '0'}</td>
                         <td className="num" style={{ color: 'var(--purpur)' }}>{Number(g.bonus_points) ? fmtPts(g.bonus_points, '') : '·'}</td>
                         <td className="num">{(groupTrophies.get(g.group_id) ?? 0) > 0 ? `🏆${groupTrophies.get(g.group_id)}` : '·'}</td>
-                        <td className="num" style={{ fontWeight: 800 }}>{fmtPts(g.total, '')}</td>
+                        <td className="num" style={{ fontWeight: 800, color: gLiveTot ? 'var(--petrol)' : undefined }} title={gLiveTot ? t('common.liveProvisional') : undefined}>{fmtPts(gTotalOf(g), '')}</td>
                       </tr>
-                    ))
+                      )
+                    })
                     : rows.map((p, i) => {
                       const isMe = p.id === me
                       const tot = totalsMap.get(p.id)
                       const tr = trophies.get(p.id) ?? 0
+                      const liveMd = md != null ? (userLive.get(p.id)?.byMd.get(md) ?? 0) : 0
+                      const liveTot = userLive.get(p.id)?.total ?? 0
                       return (
                         <tr key={p.id} className={isMe ? 'me' : undefined} style={isMe ? { background: 'var(--cream)' } : undefined}>
                           <td className="col-pos" style={{ color: 'var(--navy-300)', fontWeight: 700 }}>{i + 1}</td>
@@ -298,12 +326,12 @@ export default function Tippuebersicht() {
                             {isMe && <span className="badge petrol" style={{ marginLeft: 6 }}>{t('uebersicht.you')}</span>}
                           </td>
                           {dayMatches.map((m) => (
-                            <td key={m.id} className="num"><TipCell tip={tipsMap.get(`${p.id}|${m.id}`)} tipped={statusSet.has(`${p.id}|${m.id}`)} locked={kickoffLocked(m.kickoff)} finished={m.status === 'FINISHED'} /></td>
+                            <td key={m.id} className="num"><TipCell tip={tipsMap.get(`${p.id}|${m.id}`)} tipped={statusSet.has(`${p.id}|${m.id}`)} locked={kickoffLocked(m.kickoff)} finished={m.status === 'FINISHED'} live={isLive(m)} livePts={liveTipPoints(tipsMap.get(`${p.id}|${m.id}`), m)} /></td>
                           ))}
-                          <td className="num" style={{ fontWeight: 700 }}>{md != null ? ptsOf(p.id, md) : 0}</td>
+                          <td className="num" style={{ fontWeight: 700, color: liveMd ? 'var(--petrol)' : undefined }} title={liveMd ? t('common.liveProvisional') : undefined}>{md != null ? ptsOf(p.id, md) : 0}</td>
                           <td className="num" style={{ color: 'var(--purpur)' }}>{tot?.bonus_points ?? 0}</td>
                           <td className="num">{tr > 0 ? `🏆${tr}` : '·'}</td>
-                          <td className="num" style={{ fontWeight: 800 }}>{tot?.total ?? 0}</td>
+                          <td className="num" style={{ fontWeight: 800, color: liveTot ? 'var(--petrol)' : undefined }} title={liveTot ? t('common.liveProvisional') : undefined}>{totalOf(p.id)}</td>
                         </tr>
                       )
                     })}
@@ -318,10 +346,12 @@ export default function Tippuebersicht() {
   )
 }
 
-function TipCell({ tip, tipped, locked, finished }: { tip?: Tip; tipped: boolean; locked: boolean; finished: boolean }) {
+function TipCell({ tip, tipped, locked, finished, live, livePts }: { tip?: Tip; tipped: boolean; locked: boolean; finished: boolean; live?: boolean; livePts?: number | null }) {
   if (tip) {
-    const cls = finished && tip.points != null ? ptsClass(tip.points) : ''
-    return <span className={cls} style={{ fontFamily: 'var(--font-mono)' }}>{tip.home}:{tip.away}</span>
+    // Live: vorläufig nach Live-Stand einfärben (kursiv = noch nicht final)
+    const cls = finished && tip.points != null ? ptsClass(tip.points)
+      : live && livePts != null ? ptsClass(livePts) : ''
+    return <span className={cls} style={{ fontFamily: 'var(--font-mono)', fontStyle: live ? 'italic' : undefined }}>{tip.home}:{tip.away}</span>
   }
   if (!locked && tipped) return <span style={{ color: 'var(--petrol)' }} title="getippt">✓</span>
   if (!locked) return <span style={{ color: 'var(--gray)' }}>–</span>
@@ -329,8 +359,8 @@ function TipCell({ tip, tipped, locked, finished }: { tip?: Tip; tipped: boolean
 }
 
 /** Eine Zelle der Gruppen-Kreuztabelle: Ø-Punkte der Gruppe für ein Spiel. */
-function GroupCell({ avg, locked }: { avg?: number; locked: boolean }) {
-  if (avg != null) return <span className={ptsClass(Math.round(avg))} style={{ fontFamily: 'var(--font-mono)' }}>{fmtPts(avg, '')}</span>
+function GroupCell({ avg, locked, live }: { avg?: number; locked: boolean; live?: boolean }) {
+  if (avg != null) return <span className={live ? '' : ptsClass(Math.round(avg))} style={{ fontFamily: 'var(--font-mono)', color: live ? 'var(--petrol)' : undefined, fontStyle: live ? 'italic' : undefined }}>{fmtPts(avg, '')}</span>
   return <span style={{ color: 'var(--gray)', fontFamily: 'var(--font-mono)' }}>{locked ? '·' : '–'}</span>
 }
 

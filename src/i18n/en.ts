@@ -29,6 +29,8 @@ export const en = {
       group: 'Group',
       deadline: 'Deadline',
       locked: 'Locked',
+      live: 'LIVE',
+      liveProvisional: 'Provisional points – match still in play',
       open: 'Open',
       vs: 'vs',
       back: 'Back',

@@ -86,7 +86,11 @@ create table if not exists matches (
   winner       text,                        -- HOME_TEAM | AWAY_TEAM | DRAW
   -- gewertetes Ergebnis (inkl. Elfmeter-Konvention, von 'sync' gesetzt):
   eff_home     int,
-  eff_away     int
+  eff_away     int,
+  -- Live-Zwischenstand während eines laufenden Spiels (status LIVE); getrennt von
+  -- full_*, damit die Wertung erst bei Abpfiff greift. null wenn nicht live.
+  live_home    int,
+  live_away    int
 );
 create index if not exists matches_matchday_idx on matches (matchday, kickoff);
 

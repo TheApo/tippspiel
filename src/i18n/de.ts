@@ -29,6 +29,8 @@ export const de = {
       group: 'Gruppe',
       deadline: 'Tippfrist',
       locked: 'Gesperrt',
+      live: 'LIVE',
+      liveProvisional: 'Vorläufige Punkte – Spiel läuft noch',
       open: 'Offen',
       vs: 'gegen',
       back: 'Zurück',

@@ -184,7 +184,9 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
 
   // 3) Spiele upserten
   const rows = fdMatches.map((m) => {
-    const finished = mapStatus(m.status) === 'FINISHED' && m.score.fullTime.home != null
+    const st = mapStatus(m.status)
+    const finished = st === 'FINISHED' && m.score.fullTime.home != null
+    const live = st === 'LIVE'
     const ft: Goals = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 }
     const eff = finished ? effectiveGoals(ft, m.score.duration as MatchDuration, m.score.winner as Winner) : null
     return {
@@ -193,7 +195,7 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
       stage: STAGE_MAP[m.stage] ?? 'GROUP',
       group_letter: m.stage === 'GROUP_STAGE' ? groupLetter(m.group) : null,
       kickoff: m.utcDate,
-      status: mapStatus(m.status),
+      status: st,
       home_team_id: m.homeTeam?.id ? String(m.homeTeam.id) : null,
       away_team_id: m.awayTeam?.id ? String(m.awayTeam.id) : null,
       full_home: finished ? ft.home : null,
@@ -202,6 +204,9 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
       winner: m.score.winner ?? null,
       eff_home: eff?.home ?? null,
       eff_away: eff?.away ?? null,
+      // Live-Zwischenstand nur während des Spiels; sonst zurücksetzen.
+      live_home: live ? (m.score.fullTime.home ?? 0) : null,
+      live_away: live ? (m.score.fullTime.away ?? 0) : null,
     }
   })
   if (rows.length) await db.from('matches').upsert(rows)

@@ -8,6 +8,8 @@ import { fmtDate, fmtTime, kickoffLocked, ptsClass } from '../lib/format'
 import { matchdayLabel, matchLabel } from '../lib/matchday'
 import { impliedProbs } from '../lib/odds'
 import { teamName } from '../lib/teamNames'
+import { isLive, liveTipPoints } from '../lib/live'
+import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 import ConfirmDialog from '../components/ConfirmDialog'
 
@@ -49,6 +51,10 @@ export default function Tippen() {
     () => [...new Set(matches.map((m) => m.matchday))].sort((a, b) => a - b),
     [matches],
   )
+
+  // Laufende Spiele: alle ~20 s nachladen, damit der Live-Stand aktuell bleibt.
+  const anyLive = useMemo(() => matches.some(isLive), [matches])
+  useLiveRefresh(anyLive, load)
 
   // Default-Spieltag: erster mit offenen Spielen — abgeleitet statt per Effekt gesetzt.
   const defaultMd = useMemo(() => {
@@ -221,6 +227,8 @@ function MatchRow({
   const { t } = useTranslation()
   const locked = kickoffLocked(m.kickoff)
   const finished = m.status === 'FINISHED' && m.full_home != null
+  const live = isLive(m)
+  const livePts = live ? liveTipPoints(tip, m) : null
   const penalty = m.duration === 'PENALTY_SHOOTOUT'
   const extra = m.duration === 'EXTRA_TIME'
   const probs = impliedProbs(m.odd_home, m.odd_draw, m.odd_away)
@@ -275,6 +283,12 @@ function MatchRow({
               <span className="muted" style={{ fontSize: '.72rem', display: 'block' }}>{t('tippen.counted', { h: m.eff_home, a: m.eff_away })}</span>
             )}
             {tip?.points != null && <span className={ptsClass(tip.points)} style={{ fontSize: '1.1rem', display: 'block' }}>+{tip.points}</span>}
+          </div>
+        ) : live ? (
+          <div>
+            <span className="badge live">{t('common.live')}</span>
+            <span className="live-score" style={{ display: 'block', marginTop: 2 }}>{m.live_home}:{m.live_away}</span>
+            {livePts != null && <span className="pts-live" title={t('common.liveProvisional')} style={{ display: 'block' }}>+{livePts}</span>}
           </div>
         ) : locked ? (
           <span className="badge purpur">{t('common.locked')}</span>

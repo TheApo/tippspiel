@@ -208,6 +208,11 @@ input:focus, select:focus { border-color: var(--petrol); box-shadow: 0 0 0 3px v
 .badge.cream { background: var(--cream); color: var(--navy); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
 
+/* Live-Zwischenstand (deutlich vom schwarzen Endergebnis unterscheidbar) */
+.live-score { font-family: var(--font-mono); font-weight: 700; color: var(--petrol); }
+.pts-live { color: var(--petrol); font-weight: 800; }
+.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; background: var(--purpur); animation: pulse 1.6s infinite; }
+
 .pts { font-family: var(--font-mono); font-weight: 700; }
 .pts.p4 { color: var(--purpur); }
 .pts.p3 { color: var(--petrol); }
