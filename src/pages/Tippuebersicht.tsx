@@ -14,7 +14,7 @@ import {
 import { fmtDate, fmtTime, kickoffLocked, ptsClass, truncateName, fmtPts } from '../lib/format'
 import { matchdayLabel } from '../lib/matchday'
 import { teamName } from '../lib/teamNames'
-import { isLive, liveTipPoints, userLiveDeltas, groupLiveDeltas, groupLiveMatchAvgs } from '../lib/live'
+import { isLive, inLiveWindow, liveTipPoints, userLiveDeltas, groupLiveDeltas, groupLiveMatchAvgs } from '../lib/live'
 import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
@@ -60,7 +60,7 @@ export default function Tippuebersicht() {
 
   // Laufende Spiele: regelmäßig nachladen für aktuelle Live-Stände/-Punkte.
   const liveMatches = useMemo(() => matches.filter(isLive), [matches])
-  useLiveRefresh(liveMatches.length > 0, reload)
+  useLiveRefresh(() => matches.some((m) => inLiveWindow(m)), reload)
 
   const teamsMap = useMemo(() => new Map(teams.map((x) => [x.id, x])), [teams])
   const matchesByMd = useMemo(() => {

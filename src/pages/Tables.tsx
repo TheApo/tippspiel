@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { fetchMatches, fetchTeams } from '../lib/queries'
 import type { Match, Team } from '../lib/types'
 import { teamName } from '../lib/teamNames'
-import { isLive } from '../lib/live'
+import { isLive, inLiveWindow } from '../lib/live'
 import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
@@ -45,7 +45,7 @@ export default function Tables() {
 
   // Laufende Gruppenspiele markieren (Tabellenstände bleiben bis Abpfiff)
   const liveMatches = useMemo(() => matches.filter(isLive), [matches])
-  useLiveRefresh(liveMatches.length > 0, reload)
+  useLiveRefresh(() => matches.some((m) => inLiveWindow(m)), reload)
   const liveByTeam = useMemo(() => {
     const map = new Map<string, Match>()
     for (const m of liveMatches) {

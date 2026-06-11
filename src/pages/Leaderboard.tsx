@@ -8,7 +8,7 @@ import {
 import type { UserTotals, MatchdayPoints, Match, GroupTotals, GroupMatchdayPoints, Tip, GroupMember } from '../lib/types'
 import { matchdayShort } from '../lib/matchday'
 import { truncateName, fmtPts } from '../lib/format'
-import { isLive, userLiveDeltas, groupLiveDeltas } from '../lib/live'
+import { isLive, inLiveWindow, userLiveDeltas, groupLiveDeltas } from '../lib/live'
 import { useLiveRefresh } from '../lib/useLiveRefresh'
 
 const MIN_GROUP = 2
@@ -39,7 +39,7 @@ export default function Leaderboard() {
 
   // Vorläufige Live-Punkte (überlagern die bestätigten Totals bis Abpfiff)
   const liveMatches = useMemo(() => matches.filter(isLive), [matches])
-  useLiveRefresh(liveMatches.length > 0, reload)
+  useLiveRefresh(() => matches.some((m) => inLiveWindow(m)), reload)
   const userLive = useMemo(() => userLiveDeltas(liveMatches, tips), [liveMatches, tips])
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members])
   const groupLive = useMemo(() => groupLiveDeltas(liveMatches, tips, activeMembers), [liveMatches, tips, activeMembers])

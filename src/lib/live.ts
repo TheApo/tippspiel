@@ -8,6 +8,18 @@ export function isLive(m: Match): boolean {
   return m.status === 'LIVE' && m.live_home != null && m.live_away != null
 }
 
+// Muss LIVE_GRACE_MS des Syncs abdecken (Verlängerung + Elfmeterschießen).
+const LIVE_WINDOW_MS = 165 * 60_000
+
+/** true, wenn das Spiel läuft ODER laut Anstoßzeit gerade laufen müsste
+ *  (steuert das Live-Polling, auch wenn der Sync noch SCHEDULED meldet). */
+export function inLiveWindow(m: Match, now = Date.now()): boolean {
+  if (isLive(m)) return true
+  if (m.status === 'FINISHED') return false
+  const ko = Date.parse(m.kickoff)
+  return now >= ko - 2 * 60_000 && now - ko <= LIVE_WINDOW_MS
+}
+
 /** Aktueller Live-Stand eines Spiels, oder null wenn nicht live. */
 export function liveGoals(m: Match): Goals | null {
   return isLive(m) ? { home: m.live_home as number, away: m.live_away as number } : null

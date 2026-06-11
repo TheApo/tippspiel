@@ -34,6 +34,13 @@ function mapStatus(s: string): string {
   if (s === 'IN_PLAY' || s === 'PAUSED') return 'LIVE'
   return 'SCHEDULED'
 }
+
+// football-data liefert unter Last zeitweise veraltete Antworten (stale Cache):
+// Ein laufendes Spiel kommt dann wieder als TIMED zurück und würde den
+// Live-Status alle 10 s löschen. Daher gilt: Ein Spiel, das laut Anstoßzeit
+// laufen müsste, fällt nie auf SCHEDULED zurück (Fenster deckt Verlängerung +
+// Elfmeterschießen; danach greift wieder der API-Status).
+const LIVE_GRACE_MS = 165 * 60_000
 function groupLetter(g: string | null): string | null {
   if (!g) return null
   const m = g.match(/([A-L])\s*$/i)
@@ -65,7 +72,7 @@ interface FdMatch {
   score: { winner: string | null; duration: string; fullTime: { home: number | null; away: number | null } }
 }
 
-export interface SyncResult { teams: number; matches: number }
+export interface SyncResult { teams: number; matches: number; live?: string[] }
 
 /** 1 API-Call: nur Spiele/Ergebnisse synchronisieren + Tipps werten. */
 export async function syncMatchesOnly(db: Db, fdFetch: FdFetch): Promise<SyncResult> {
@@ -166,7 +173,10 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
       })
     }
   }
-  if (teams.size) await db.from('teams').upsert([...teams.values()])
+  if (teams.size) {
+    const { error } = await db.from('teams').upsert([...teams.values()])
+    if (error) throw new Error(`teams upsert: ${error.message}`)
+  }
 
   // 2) Unsere Spieltage
   const ourMd = new Map<number, number>()
@@ -183,12 +193,34 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
   }
 
   // 3) Spiele upserten
+  // Bekannte Live-Stände lesen, damit eine veraltete API-Antwort (stale Cache)
+  // einen bereits gesehenen Zwischenstand nicht auf 0:0 zurücksetzt.
+  const { data: existing } = await db.from('matches').select('id, live_home, live_away')
+  const exLive = new Map<number, { live_home: number | null; live_away: number | null }>(
+    ((existing ?? []) as Array<{ id: number; live_home: number | null; live_away: number | null }>)
+      .map((e) => [e.id, e]),
+  )
+  const now = Date.now()
+  const liveDbg: string[] = []
   const rows = fdMatches.map((m) => {
-    const st = mapStatus(m.status)
+    const raw = m.status
+    let st = mapStatus(raw)
+    const ko = Date.parse(m.utcDate)
+    const shouldRun = now >= ko && now - ko <= LIVE_GRACE_MS
+    // Anti-Flackern: API meldet TIMED/SCHEDULED, obwohl das Spiel laufen müsste
+    // -> LIVE halten statt zurückstufen. (POSTPONED/CANCELLED bleiben unberührt.)
+    if (st === 'SCHEDULED' && (raw === 'TIMED' || raw === 'SCHEDULED') && shouldRun) st = 'LIVE'
     const finished = st === 'FINISHED' && m.score.fullTime.home != null
     const live = st === 'LIVE'
+    // Nur echte Live-Antworten tragen einen aktuellen Spielstand; bei einem
+    // Cache-Rückfall den zuletzt bekannten Stand behalten (Fallback 0:0).
+    const fresh = raw === 'IN_PLAY' || raw === 'PAUSED'
+    const ex = exLive.get(m.id)
     const ft: Goals = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 }
     const eff = finished ? effectiveGoals(ft, m.score.duration as MatchDuration, m.score.winner as Winner) : null
+    const liveHome = live ? (fresh ? ft.home : (ex?.live_home ?? m.score.fullTime.home ?? 0)) : null
+    const liveAway = live ? (fresh ? ft.away : (ex?.live_away ?? m.score.fullTime.away ?? 0)) : null
+    if (live || shouldRun) liveDbg.push(`${m.id}:${raw}->${st}@${liveHome ?? '-'}:${liveAway ?? '-'}`)
     return {
       id: m.id,
       matchday: ourMd.get(m.id) ?? 99,
@@ -204,18 +236,20 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
       winner: m.score.winner ?? null,
       eff_home: eff?.home ?? null,
       eff_away: eff?.away ?? null,
-      // Live-Zwischenstand nur während des Spiels; sonst zurücksetzen.
-      live_home: live ? (m.score.fullTime.home ?? 0) : null,
-      live_away: live ? (m.score.fullTime.away ?? 0) : null,
+      live_home: liveHome,
+      live_away: liveAway,
     }
   })
-  if (rows.length) await db.from('matches').upsert(rows)
+  if (rows.length) {
+    const { error } = await db.from('matches').upsert(rows)
+    if (error) throw new Error(`matches upsert: ${error.message}`)
+  }
 
   // 4) Bonus-Deadline = frühester Anstoß
   const firstKick = fdMatches.map((m) => m.utcDate).sort()[0]
   if (firstKick) await db.from('app_settings').update({ bonus_deadline: firstKick }).eq('id', 1)
 
-  return { teams: teams.size, matches: rows.length }
+  return { teams: teams.size, matches: rows.length, live: liveDbg }
 }
 
 async function resolveBonus(
@@ -301,6 +335,9 @@ async function recomputeBonus(db: Db) {
 async function upsertChunked(db: Db, table: string, rows: unknown[]) {
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500)
-    if (chunk.length) await db.from(table).upsert(chunk)
+    if (chunk.length) {
+      const { error } = await db.from(table).upsert(chunk)
+      if (error) throw new Error(`${table} upsert: ${error.message}`)
+    }
   }
 }

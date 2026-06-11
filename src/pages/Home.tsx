@@ -6,7 +6,7 @@ import { fetchMatches, fetchTeams, fetchSettings, fetchUserTotals } from '../lib
 import type { Match, Team, AppSettings, UserTotals } from '../lib/types'
 import { fmtDateTime, kickoffLocked, truncateName } from '../lib/format'
 import { teamName } from '../lib/teamNames'
-import { isLive } from '../lib/live'
+import { isLive, inLiveWindow } from '../lib/live'
 import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
@@ -29,7 +29,7 @@ export default function Home() {
 
   const teamsMap = useMemo(() => new Map(teams.map((x) => [x.id, x])), [teams])
   const liveMatches = useMemo(() => matches.filter(isLive), [matches])
-  useLiveRefresh(liveMatches.length > 0, reload)
+  useLiveRefresh(() => matches.some((m) => inLiveWindow(m)), reload)
   const next = useMemo(
     () => matches.filter((m) => !kickoffLocked(m.kickoff) && m.home_team_id && m.away_team_id).slice(0, 5),
     [matches],

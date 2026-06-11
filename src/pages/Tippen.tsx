@@ -8,7 +8,7 @@ import { fmtDate, fmtTime, kickoffLocked, ptsClass } from '../lib/format'
 import { matchdayLabel, matchLabel } from '../lib/matchday'
 import { impliedProbs } from '../lib/odds'
 import { teamName } from '../lib/teamNames'
-import { isLive, liveTipPoints } from '../lib/live'
+import { isLive, inLiveWindow, liveTipPoints } from '../lib/live'
 import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -52,10 +52,6 @@ export default function Tippen() {
     [matches],
   )
 
-  // Laufende Spiele: alle ~20 s nachladen, damit der Live-Stand aktuell bleibt.
-  const anyLive = useMemo(() => matches.some(isLive), [matches])
-  useLiveRefresh(anyLive, load)
-
   // Default-Spieltag: erster mit offenen Spielen — abgeleitet statt per Effekt gesetzt.
   const defaultMd = useMemo(() => {
     if (matchdays.length === 0) return null
@@ -84,6 +80,10 @@ export default function Tippen() {
     [dayMatches, draft, tipsMap],
   )
   const dirty = dayJobs.length > 0
+
+  // Laufende Spiele: alle ~20 s nachladen, damit der Live-Stand aktuell bleibt —
+  // aber nie, solange ungespeicherte Tipps im Entwurf stehen (load() ersetzt den Draft).
+  useLiveRefresh(() => !dirty && matches.some((m) => inLiveWindow(m)), load)
 
   // Tipp-Warnung beim Seitenwechsel (Router) — über den UnsavedGuard im Layout.
   const { setDirty, registerSave } = useUnsaved()
