@@ -193,13 +193,16 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
   }
 
   // 3) Spiele upserten
-  // Bekannte Live-Stände lesen, damit eine veraltete API-Antwort (stale Cache)
-  // einen bereits gesehenen Zwischenstand nicht auf 0:0 zurücksetzt.
-  const { data: existing } = await db.from('matches').select('id, live_home, live_away')
-  const exLive = new Map<number, { live_home: number | null; live_away: number | null }>(
-    ((existing ?? []) as Array<{ id: number; live_home: number | null; live_away: number | null }>)
-      .map((e) => [e.id, e]),
-  )
+  // Bekannten Stand lesen, damit eine veraltete API-Antwort (stale Cache) weder
+  // einen Live-Zwischenstand auf 0:0 noch ein bestätigtes Endergebnis zurücksetzt.
+  interface ExRow {
+    id: number; status: string; live_home: number | null; live_away: number | null
+    full_home: number | null; full_away: number | null; duration: string | null
+    winner: string | null; eff_home: number | null; eff_away: number | null
+  }
+  const { data: existing } = await db.from('matches')
+    .select('id, status, live_home, live_away, full_home, full_away, duration, winner, eff_home, eff_away')
+  const exById = new Map<number, ExRow>(((existing ?? []) as ExRow[]).map((e) => [e.id, e]))
   const now = Date.now()
   const liveDbg: string[] = []
   const rows = fdMatches.map((m) => {
@@ -207,6 +210,31 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
     let st = mapStatus(raw)
     const ko = Date.parse(m.utcDate)
     const shouldRun = now >= ko && now - ko <= LIVE_GRACE_MS
+    const ex = exById.get(m.id)
+    // Einmal bestätigt = bestätigt: Ein FINISHED-Spiel (vom Sync oder Admin
+    // gesetzt) fällt nie auf eine veraltete Nicht-FINISHED-Antwort zurück.
+    // Erst eine echte FINISHED-Antwort der API überschreibt es wieder.
+    if (ex?.status === 'FINISHED' && st !== 'FINISHED') {
+      liveDbg.push(`${m.id}:${raw}->FINISHED(kept)`)
+      return {
+        id: m.id,
+        matchday: ourMd.get(m.id) ?? 99,
+        stage: STAGE_MAP[m.stage] ?? 'GROUP',
+        group_letter: m.stage === 'GROUP_STAGE' ? groupLetter(m.group) : null,
+        kickoff: m.utcDate,
+        status: 'FINISHED',
+        home_team_id: m.homeTeam?.id ? String(m.homeTeam.id) : null,
+        away_team_id: m.awayTeam?.id ? String(m.awayTeam.id) : null,
+        full_home: ex.full_home,
+        full_away: ex.full_away,
+        duration: ex.duration ?? 'REGULAR',
+        winner: ex.winner,
+        eff_home: ex.eff_home,
+        eff_away: ex.eff_away,
+        live_home: null,
+        live_away: null,
+      }
+    }
     // Anti-Flackern: API meldet TIMED/SCHEDULED, obwohl das Spiel laufen müsste
     // -> LIVE halten statt zurückstufen. (POSTPONED/CANCELLED bleiben unberührt.)
     if (st === 'SCHEDULED' && (raw === 'TIMED' || raw === 'SCHEDULED') && shouldRun) st = 'LIVE'
@@ -215,7 +243,6 @@ async function upsertMatches(db: Db, fdMatches: FdMatch[]): Promise<SyncResult> 
     // Nur echte Live-Antworten tragen einen aktuellen Spielstand; bei einem
     // Cache-Rückfall den zuletzt bekannten Stand behalten (Fallback 0:0).
     const fresh = raw === 'IN_PLAY' || raw === 'PAUSED'
-    const ex = exLive.get(m.id)
     const ft: Goals = { home: m.score.fullTime.home ?? 0, away: m.score.fullTime.away ?? 0 }
     const eff = finished ? effectiveGoals(ft, m.score.duration as MatchDuration, m.score.winner as Winner) : null
     const liveHome = live ? (fresh ? ft.home : (ex?.live_home ?? m.score.fullTime.home ?? 0)) : null
