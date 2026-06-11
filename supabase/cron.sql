@@ -4,8 +4,8 @@
 --  und die Secrets (FOOTBALL_DATA_TOKEN, SYNC_SECRET) gesetzt sind.
 --
 --  Clever: Der Job tickt alle 10s, ruft die Function aber NUR auf, wenn gerade
---  ein Spiel im Zeitfenster läuft -> [Anpfiff − 30 min , Anpfiff + 180 min].
---  180 min deckt 90 min + Halbzeit + Verlängerung + Elfmeterschießen + Puffer.
+--  ein Spiel im Zeitfenster läuft -> [Anpfiff − 30 min , Anpfiff + 210 min].
+--  210 min deckt 90 min + Halbzeit + Verlängerung + langes Elfmeterschießen + Puffer.
 --  Außerhalb der Spielzeiten kostet es 0 API-Calls und 0 Function-Aufrufe.
 --
 --  Vorher <SYNC_SECRET> ersetzen (= Wert aus `supabase secrets set SYNC_SECRET=...`).
@@ -21,7 +21,7 @@ language sql stable as $$
   select exists (
     select 1 from public.matches m
     where now() >= m.kickoff - interval '30 minutes'
-      and now() <= m.kickoff + interval '180 minutes'
+      and now() <= m.kickoff + interval '210 minutes'
   );
 $$;
 

@@ -40,7 +40,7 @@ function mapStatus(s: string): string {
 // Live-Status alle 10 s löschen. Daher gilt: Ein Spiel, das laut Anstoßzeit
 // laufen müsste, fällt nie auf SCHEDULED zurück (Fenster deckt Verlängerung +
 // Elfmeterschießen; danach greift wieder der API-Status).
-const LIVE_GRACE_MS = 165 * 60_000
+const LIVE_GRACE_MS = 185 * 60_000
 function groupLetter(g: string | null): string | null {
   if (!g) return null
   const m = g.match(/([A-L])\s*$/i)

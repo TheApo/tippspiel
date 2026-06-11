@@ -9,7 +9,7 @@ export function isLive(m: Match): boolean {
 }
 
 // Muss LIVE_GRACE_MS des Syncs abdecken (Verlängerung + Elfmeterschießen).
-const LIVE_WINDOW_MS = 165 * 60_000
+const LIVE_WINDOW_MS = 185 * 60_000
 
 /** true, wenn das Spiel läuft ODER laut Anstoßzeit gerade laufen müsste
  *  (steuert das Live-Polling, auch wenn der Sync noch SCHEDULED meldet). */
