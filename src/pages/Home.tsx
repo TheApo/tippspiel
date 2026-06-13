@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
-import { fetchMatches, fetchTeams, fetchSettings, fetchUserTotals } from '../lib/queries'
-import type { Match, Team, AppSettings, UserTotals } from '../lib/types'
+import { fetchMatches, fetchTeams, fetchSettings, fetchUserTotals, fetchVisibleTips } from '../lib/queries'
+import type { Match, Team, AppSettings, UserTotals, Tip } from '../lib/types'
 import { fmtDateTime, kickoffLocked, truncateName } from '../lib/format'
 import { teamName } from '../lib/teamNames'
-import { isLive, inLiveWindow } from '../lib/live'
+import { isLive, inLiveWindow, userLiveDeltas } from '../lib/live'
 import { useLiveRefresh } from '../lib/useLiveRefresh'
 import { Flag } from '../components/Flag'
 
@@ -17,11 +17,14 @@ export default function Home() {
   const [teams, setTeams] = useState<Team[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [totals, setTotals] = useState<UserTotals[]>([])
+  const [tips, setTips] = useState<Tip[]>([])
   const [loading, setLoading] = useState(true)
 
   async function reload() {
-    const [m, tm, s, tot] = await Promise.all([fetchMatches(), fetchTeams(), fetchSettings(), fetchUserTotals()])
-    setMatches(m); setTeams(tm); setSettings(s); setTotals(tot)
+    const [m, tm, s, tot, tp] = await Promise.all([
+      fetchMatches(), fetchTeams(), fetchSettings(), fetchUserTotals(), fetchVisibleTips(),
+    ])
+    setMatches(m); setTeams(tm); setSettings(s); setTotals(tot); setTips(tp)
   }
   useEffect(() => {
     void (async () => { try { await reload() } finally { setLoading(false) } })()
@@ -34,9 +37,20 @@ export default function Home() {
     () => matches.filter((m) => !kickoffLocked(m.kickoff) && m.home_team_id && m.away_team_id).slice(0, 5),
     [matches],
   )
-  const myIdx = totals.findIndex((u) => u.user_id === session?.user.id)
-  const me = myIdx >= 0 ? totals[myIdx] : null
-  const top3 = totals.slice(0, 3)
+
+  // Vorläufige Live-Punkte (überlagern die bestätigten Totals bis Abpfiff) — wie
+  // in Gesamtliste/Tippübersicht. Re-Sortierung erzeugt den Live-Platz.
+  const userLive = useMemo(() => userLiveDeltas(liveMatches, tips), [liveMatches, tips])
+  const ranked = useMemo(
+    () => [...totals]
+      .map((u) => ({ ...u, liveDelta: userLive.get(u.user_id)?.total ?? 0, liveTotal: u.total + (userLive.get(u.user_id)?.total ?? 0) }))
+      .sort((a, b) => b.liveTotal - a.liveTotal),
+    [totals, userLive],
+  )
+  const myIdx = ranked.findIndex((u) => u.user_id === session?.user.id)
+  const me = myIdx >= 0 ? ranked[myIdx] : null
+  const top3 = ranked.slice(0, 3)
+  const liveActive = liveMatches.length > 0
   const bonusOpen = !settings?.bonus_deadline || !kickoffLocked(settings.bonus_deadline)
   const lng = i18n.resolvedLanguage ?? 'de'
 
@@ -64,8 +78,8 @@ export default function Home() {
 
       {/* Stat cards */}
       <div className="row wrap" style={{ gap: 16, alignItems: 'stretch' }}>
-        <StatCard label={t('home.yourRank')} value={me ? `#${myIdx + 1}` : '—'} accent />
-        <StatCard label={t('home.yourPoints')} value={me ? String(me.total) : '0'} />
+        <StatCard label={t('home.yourRank')} value={me ? `#${myIdx + 1}` : '—'} accent live={liveActive && !!me} liveTitle={t('common.liveProvisional')} />
+        <StatCard label={t('home.yourPoints')} value={me ? String(me.liveTotal) : '0'} live={!!me && me.liveDelta !== 0} liveTitle={t('common.liveProvisional')} />
         <StatCard
           label={t('common.bonus')}
           value={bonusOpen ? t('common.open') : t('common.locked')}
@@ -124,7 +138,7 @@ export default function Home() {
                 <li key={u.user_id} className="row" style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', gap: 12 }}>
                   <span className="tag-rule" style={{ background: i === 0 ? 'var(--purpur)' : 'var(--lilac)', color: i === 0 ? '#fff' : 'var(--navy)' }}>{i + 1}</span>
                   <strong style={{ flex: 1, fontWeight: 600 }}>{truncateName(u.display_name)}</strong>
-                  <span className="pts p2" style={{ fontSize: '1.1rem' }}>{u.total}</span>
+                  <span className="pts p2" style={{ fontSize: '1.1rem', color: u.liveDelta ? 'var(--petrol)' : undefined }} title={u.liveDelta ? t('common.liveProvisional') : undefined}>{u.liveTotal}</span>
                 </li>
               ))}
             </ul>
@@ -135,11 +149,17 @@ export default function Home() {
   )
 }
 
-function StatCard({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: boolean }) {
+function StatCard({ label, value, hint, accent, live, liveTitle }: { label: string; value: string; hint?: string; accent?: boolean; live?: boolean; liveTitle?: string }) {
   return (
     <div className="card pad" style={{ flex: '1 1 200px', borderTop: `4px solid ${accent ? 'var(--purpur)' : 'var(--petrol)'}` }}>
       <span className="eyebrow">{label}</span>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.4rem', color: 'var(--navy)', lineHeight: 1.1 }}>{value}</div>
+      <div
+        title={live ? liveTitle : undefined}
+        style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2.4rem', color: live ? 'var(--petrol)' : 'var(--navy)', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: 8 }}
+      >
+        {value}
+        {live && <span className="live-dot" />}
+      </div>
       {hint && <span className="muted" style={{ fontSize: '.8rem' }}>{hint}</span>}
     </div>
   )
